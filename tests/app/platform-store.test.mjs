@@ -43,3 +43,38 @@ test('store supports publish, proposal submission, evaluation, award, and suppli
   assert.equal(restored.notice.status, NoticeStatus.Published);
   assert.ok(store.listActivity().length >= 4);
 });
+
+test('store rejects notice creation by non-buyers', () => {
+  const store = createPlatformStore(createSeedData());
+
+  assert.throws(() => store.createNotice('member-supplier-1', {
+    id: 'notice-supplier-owned',
+    title: 'Supplier Created Notice',
+    category: 'IT',
+    requirements: 'This should not be allowed.',
+    deadlineAt: '2026-07-10T00:00:00.000Z',
+    evaluationCriteria: 'Price 50, technical 50',
+  }), { code: 'ONLY_BUYERS_CREATE_NOTICES' });
+});
+
+test('store rejects evaluation start by non-owner suppliers', () => {
+  const store = createPlatformStore(createSeedData());
+
+  store.closeNotice('notice-seed-1', '2026-07-06T00:00:00.000Z');
+
+  assert.throws(
+    () => store.startEvaluation('member-supplier-1', 'notice-seed-1', '2026-07-06T01:00:00.000Z'),
+    { code: 'NOTICE_OWNER_REQUIRED' }
+  );
+});
+
+test('store rejects saving hidden notices', () => {
+  const store = createPlatformStore(createSeedData());
+
+  store.hideNotice('member-operator-1', 'notice-seed-1', 'Operator review requested.', '2026-06-24T00:00:00.000Z');
+
+  assert.throws(
+    () => store.saveNotice('member-supplier-1', 'notice-seed-1'),
+    { code: 'NOTICE_NOT_PUBLIC' }
+  );
+});

@@ -1,4 +1,4 @@
-import { ActivityAction, MemberRole } from '../domain/constants.js';
+import { ActivityAction, CompanyStatus, CompanyType, MemberRole, NoticeStatus } from '../domain/constants.js';
 import { assertRule } from '../domain/errors.js';
 import { createActivityLog, createBidNotice } from '../domain/model.js';
 import { closeNotice as closeNoticeDomain, publishNotice as publishNoticeDomain, startEvaluation as startEvaluationDomain } from '../domain/bid-notices.js';
@@ -61,6 +61,7 @@ export function createPlatformStore(seed) {
       const actor = member(memberId);
       const currentNotice = notice(noticeId);
       assertRule(actor.role === MemberRole.Supplier, 'ONLY_SUPPLIERS_SAVE_NOTICES', 'Only suppliers can save bid notices.');
+      assertRule(currentNotice.status === NoticeStatus.Published, 'NOTICE_NOT_PUBLIC', 'Suppliers can save only public bid notices.');
       const existing = state.savedNotices.find((item) => item.memberId === memberId && item.noticeId === currentNotice.id);
       if (existing) return existing;
       const savedNotice = { memberId, noticeId: currentNotice.id, savedAt: new Date().toISOString() };
@@ -74,6 +75,10 @@ export function createPlatformStore(seed) {
     },
     createNotice(memberId, input) {
       const actor = member(memberId);
+      const buyerCompany = company(actor.companyId);
+      assertRule(actor.role === MemberRole.Buyer, 'ONLY_BUYERS_CREATE_NOTICES', 'Only buyers can create bid notices.');
+      assertRule(buyerCompany.type === CompanyType.Buyer, 'BUYER_COMPANY_REQUIRED', 'Only buyer companies can create notices.');
+      assertRule(buyerCompany.status === CompanyStatus.Approved, 'COMPANY_NOT_APPROVED', 'Buyer company must be approved before creating notices.');
       const nextNotice = createBidNotice({ ...input, buyerCompanyId: actor.companyId, createdByMemberId: actor.id });
       state.notices.push(nextNotice);
       return nextNotice;
@@ -103,8 +108,13 @@ export function createPlatformStore(seed) {
       return next;
     },
     startEvaluation(memberId, noticeId, now) {
-      member(memberId);
+      const actor = member(memberId);
       const current = notice(noticeId);
+      assertRule(
+        actor.role === MemberRole.Buyer && actor.companyId === current.buyerCompanyId,
+        'NOTICE_OWNER_REQUIRED',
+        'Buyers can evaluate only their own company notices.'
+      );
       const next = startEvaluationDomain({ notice: current, now });
       state.notices = replaceById(state.notices, next);
       return next;
