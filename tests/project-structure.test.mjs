@@ -15,3 +15,9 @@ test('index shell exposes an app root and module entrypoint', async () => {
   assert.match(html, /id="app"/);
   assert.match(html, /src="\.\/src\/main\.js"/);
 });
+
+test('browser entrypoint imports the app bootstrap', async () => {
+  const main = await readFile('src/main.js', 'utf8');
+
+  assert.match(main, /bootBidPlatformApp/);
+});
