@@ -6,7 +6,7 @@ test('project declares module mode and a node test command', async () => {
   const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 
   assert.equal(pkg.type, 'module');
-  assert.equal(pkg.scripts.test, 'node --test tests/**/*.test.mjs');
+  assert.equal(pkg.scripts.test, 'node --test tests/*.test.mjs tests/**/*.test.mjs');
 });
 
 test('index shell exposes an app root and module entrypoint', async () => {
