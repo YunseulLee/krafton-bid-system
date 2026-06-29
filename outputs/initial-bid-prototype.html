@@ -669,9 +669,10 @@
     }
 
     function canShowOperatorLogin() {
+      const prototypeFile = window.location.protocol === 'file:';
       const operatorQuery = window.location.search.includes('operator=1');
       const operatorPath = window.location.pathname.replace(/\/+$/, '').endsWith('/operator');
-      return operatorQuery || operatorPath;
+      return prototypeFile || operatorQuery || operatorPath;
     }
 
     function applyOperatorAccessGate() {

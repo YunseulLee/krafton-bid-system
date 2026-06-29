@@ -65,7 +65,7 @@ test('initial prototype starts with login and separates participant and operator
   assert.match(html, /operatorLoginCard\.classList\.toggle\('hidden', !canShowOperatorLogin\(\)\)/);
   assert.match(html, /function applyOperatorAccessGate/);
   assert.doesNotMatch(html, /window\.location\.hostname/);
-  assert.doesNotMatch(html, /window\.location\.protocol === 'file:'/);
+  assert.match(html, /window\.location\.protocol === 'file:'/);
   assert.doesNotMatch(html, /operatorAccessNotice/);
   assert.doesNotMatch(html, /access-note/);
   assert.doesNotMatch(html, /현재 접속 IP에서는 운영자 로그인을 표시하지 않습니다/);

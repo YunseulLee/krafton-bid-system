@@ -3,6 +3,8 @@ const OPERATOR_ALLOWED_IPS = new Set([
   '103.114.126.34',
 ]);
 
+const DEFAULT_OPERATOR_LOGIN_REVIEW_MODE = true;
+
 function normalizePathname(pathname) {
   const normalized = String(pathname || '/').replace(/\/+$/, '');
   return normalized || '/';
@@ -29,13 +31,25 @@ export function isAllowedOperatorIp(ipAddress) {
   return OPERATOR_ALLOWED_IPS.has(String(ipAddress || '').trim());
 }
 
-export default function middleware(request) {
+export function isOperatorLoginReviewModeEnabled(value = globalThis.process?.env?.OPERATOR_LOGIN_REVIEW_MODE) {
+  if (value === undefined || value === null || value === '') return DEFAULT_OPERATOR_LOGIN_REVIEW_MODE;
+  return /^(1|true|yes|on)$/i.test(String(value).trim());
+}
+
+export function protectOperatorLoginRequest(request, options = {}) {
   const url = new URL(request.url);
   if (!isOperatorLoginRequest(url)) return undefined;
+
+  const reviewMode = options.reviewMode ?? isOperatorLoginReviewModeEnabled();
+  if (reviewMode) return undefined;
 
   const clientIp = getClientIpFromRequest(request);
   if (isAllowedOperatorIp(clientIp)) return undefined;
 
   const redirectUrl = new URL('/', url.origin);
   return Response.redirect(redirectUrl, 302);
+}
+
+export default function middleware(request) {
+  return protectOperatorLoginRequest(request);
 }
