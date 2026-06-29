@@ -51,12 +51,10 @@ export function isOperatorLoginAddress(location = globalThis.location) {
 
   const pathname = String(location.pathname || '').replace(/\/+$/, '');
   const search = String(location.search || '');
-  const hash = String(location.hash || '');
   const searchParams = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
 
   return searchParams.get('operator') === '1'
-    || pathname.endsWith('/operator')
-    || hash === '#operator';
+    || pathname.endsWith('/operator');
 }
 
 export function chooseSelectedNoticeId(notices, selectedNoticeId) {

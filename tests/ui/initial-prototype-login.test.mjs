@@ -59,6 +59,9 @@ test('initial prototype starts with login and separates participant and operator
   assert.doesNotMatch(html, /ALLOWED_OPERATOR_IPS/);
   assert.match(html, /function canShowOperatorLogin/);
   assert.match(html, /operator=1/);
+  assert.doesNotMatch(html, /operatorHash/);
+  assert.doesNotMatch(html, /window\.location\.hash/);
+  assert.doesNotMatch(html, /hash\s*===\s*['"]#operator/);
   assert.match(html, /operatorLoginCard\.classList\.toggle\('hidden', !canShowOperatorLogin\(\)\)/);
   assert.match(html, /function applyOperatorAccessGate/);
   assert.doesNotMatch(html, /window\.location\.hostname/);

@@ -21,7 +21,7 @@ where email = 'operator@example.com';
 
 Do not put the operator password in source code, Vercel environment variables, or the static prototype. Supplier users should sign up from the app. Supplier login information expires after 14 days, and suppliers create a new account when the previous login information expires.
 
-The public app address shows only the participant login and signup screen. The operator login is shown only on the operator address, such as `/operator` in production or `?operator=1` for the static prototype. This is only a visibility control; the real access control is still the `operator` role in Supabase policies.
+The public app address shows only the participant login and signup screen. The operator login is shown only on the operator address, such as `/operator` in production or `?operator=1` for the static prototype. In Vercel production, the operator login address is visible only from `103.114.126.33` and `103.114.126.34`; all other IP addresses are redirected to the public login screen. This protects the operator login page visibility, and the real data access control is still the `operator` role in Supabase policies.
 
 ## Local App
 
@@ -40,7 +40,8 @@ If the Codex sandbox blocks local ports, run the same commands from a normal ter
 3. Set Build Command to `npm run build`.
 4. Set Output Directory to `dist`.
 5. Add environment variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-6. Deploy.
+6. Confirm `middleware.js` is included in the deployment. It limits `/operator` and `?operator=1` to `103.114.126.33` and `103.114.126.34`.
+7. Deploy.
 
 Do not add a Supabase service-role key to Vercel for this frontend-only app.
 

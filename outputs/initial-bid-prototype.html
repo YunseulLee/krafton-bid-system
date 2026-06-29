@@ -671,8 +671,7 @@
     function canShowOperatorLogin() {
       const operatorQuery = window.location.search.includes('operator=1');
       const operatorPath = window.location.pathname.replace(/\/+$/, '').endsWith('/operator');
-      const operatorHash = window.location.hash === '#operator';
-      return operatorQuery || operatorPath || operatorHash;
+      return operatorQuery || operatorPath;
     }
 
     function applyOperatorAccessGate() {

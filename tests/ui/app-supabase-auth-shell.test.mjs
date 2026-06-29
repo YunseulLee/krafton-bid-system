@@ -41,6 +41,7 @@ test('operator login is visible only on the operator address', async () => {
   assert.equal(app.isOperatorLoginAddress(new URL('https://bid.example.com/?operator=0')), false);
   assert.equal(app.isOperatorLoginAddress(new URL('https://bid.example.com/?operator=1')), true);
   assert.equal(app.isOperatorLoginAddress(new URL('https://bid.example.com/operator')), true);
+  assert.equal(app.isOperatorLoginAddress(new URL('https://bid.example.com/#operator')), false);
 });
 
 test('selected notice is retained only when it exists in the refreshed notice list', async () => {
