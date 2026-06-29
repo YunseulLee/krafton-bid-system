@@ -57,6 +57,16 @@ export function isOperatorLoginAddress(location = globalThis.location) {
     || pathname.endsWith('/operator');
 }
 
+export function isOperatorLoginReviewModeEnabled(value = import.meta.env?.VITE_OPERATOR_LOGIN_REVIEW_MODE) {
+  if (value === undefined || value === null || value === '') return true;
+  return /^(1|true|yes|on)$/i.test(String(value).trim());
+}
+
+export function isOperatorLoginVisible(location = globalThis.location, options = {}) {
+  const reviewMode = options.reviewMode ?? isOperatorLoginReviewModeEnabled();
+  return reviewMode || isOperatorLoginAddress(location);
+}
+
 export function chooseSelectedNoticeId(notices, selectedNoticeId) {
   const availableNotices = Array.isArray(notices) ? notices : [];
   if (selectedNoticeId && availableNotices.some((notice) => notice.id === selectedNoticeId)) {
@@ -100,8 +110,8 @@ export async function bootBidPlatformApp(root) {
   const savedMailTemplates = new Map();
 
   function loginPromptMessage() {
-    return isOperatorLoginAddress(globalThis.location)
-      ? '운영자 이메일과 비밀번호로 로그인하세요.'
+    return isOperatorLoginVisible(globalThis.location)
+      ? '입찰 참여자 또는 운영자는 로그인하세요.'
       : '입찰 참여자는 로그인하거나 가입하세요.';
   }
 
@@ -182,7 +192,7 @@ export async function bootBidPlatformApp(root) {
   }
 
   function renderLogin() {
-    const showOperatorLogin = isOperatorLoginAddress(globalThis.location);
+    const showOperatorLogin = isOperatorLoginVisible(globalThis.location);
     return `
       <section class="login-screen">
         <header class="topbar">

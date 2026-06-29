@@ -44,6 +44,15 @@ test('operator login is visible only on the operator address', async () => {
   assert.equal(app.isOperatorLoginAddress(new URL('https://bid.example.com/#operator')), false);
 });
 
+test('operator login is visible on the public login screen while review testing is enabled', async () => {
+  const app = await import('../../src/ui/app.js');
+
+  assert.equal(typeof app.isOperatorLoginVisible, 'function');
+  assert.equal(app.isOperatorLoginVisible(new URL('https://bid.example.com/')), true);
+  assert.equal(app.isOperatorLoginVisible(new URL('https://bid.example.com/'), { reviewMode: false }), false);
+  assert.equal(app.isOperatorLoginVisible(new URL('https://bid.example.com/operator'), { reviewMode: false }), true);
+});
+
 test('selected notice is retained only when it exists in the refreshed notice list', async () => {
   const app = await import('../../src/ui/app.js');
 
