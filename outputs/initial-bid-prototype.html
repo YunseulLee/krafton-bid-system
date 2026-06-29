@@ -1,0 +1,882 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>입찰 시스템 초기 프로토타입</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #17202a;
+      --muted: #5f6b7a;
+      --line: #d9dee7;
+      --accent: #0f766e;
+      --accent-soft: #e7f5f2;
+      --warn: #9a6700;
+      --danger: #b42318;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, input, textarea {
+      font: inherit;
+    }
+
+    button {
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #ffffff;
+      color: var(--ink);
+      padding: 0 14px;
+      cursor: pointer;
+    }
+
+    button:hover, button.active {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #ffffff;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .6;
+    }
+
+    .session-bar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .session-bar strong,
+    .session-bar span {
+      display: block;
+    }
+
+    .session-bar strong {
+      font-size: 14px;
+    }
+
+    .session-bar span {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .action-bar {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--line);
+      background: #eef6f5;
+      color: #115e59;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .workspace {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 24px 0 48px;
+    }
+
+    .login-screen {
+      min-height: calc(100vh - 120px);
+      display: grid;
+      align-content: center;
+      gap: 18px;
+    }
+
+    .login-copy {
+      max-width: 640px;
+    }
+
+    .login-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .login-grid.single {
+      grid-template-columns: minmax(0, 680px);
+    }
+
+    .login-card {
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      width: 100%;
+      min-height: 150px;
+      height: auto;
+      padding: 18px;
+      text-align: left;
+    }
+
+    .login-card strong {
+      display: block;
+      font-size: 20px;
+      line-height: 1.25;
+    }
+
+    .login-card span {
+      display: block;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .login-card:hover span {
+      color: #e8fbf8;
+    }
+
+    .auth-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .auth-tab {
+      justify-content: center;
+      text-align: center;
+    }
+
+    .auth-tab.active {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #ffffff;
+    }
+
+    .auth-panel {
+      display: grid;
+      gap: 10px;
+    }
+
+    .auth-note {
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f8fafc;
+      color: var(--muted);
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    h1, h2, h3, p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 0;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+
+    h2 {
+      margin-bottom: 12px;
+      font-size: 18px;
+    }
+
+    h3 {
+      margin-bottom: 10px;
+      font-size: 15px;
+    }
+
+    .eyebrow {
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      min-height: 26px;
+      border-radius: 999px;
+      padding: 0 10px;
+      background: #f0f3f7;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .status-pill.live {
+      background: var(--accent-soft);
+      color: #115e59;
+    }
+
+    .status-pill.warning {
+      background: #fff4d6;
+      color: var(--warn);
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .metric-row article,
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 16px;
+    }
+
+    .metric-row strong {
+      display: block;
+      font-size: 30px;
+      line-height: 1;
+    }
+
+    .metric-row span {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+    }
+
+    .split-layout {
+      display: grid;
+      grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr) minmax(0, 1.25fr);
+      gap: 12px;
+    }
+
+    .participant-layout {
+      grid-template-columns: minmax(220px, .8fr) minmax(0, 1.7fr);
+    }
+
+    .notice-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .notice-choice {
+      display: block;
+      width: 100%;
+      min-height: 58px;
+      height: auto;
+      padding: 10px 12px;
+      text-align: left;
+    }
+
+    .notice-choice strong,
+    .notice-choice span {
+      display: block;
+    }
+
+    .notice-choice span {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .notice-choice.active span,
+    .notice-choice:hover span {
+      color: #e8fbf8;
+    }
+
+    .detail-list {
+      display: grid;
+      gap: 8px;
+      margin: 14px 0;
+    }
+
+    .detail-list div {
+      display: grid;
+      gap: 4px;
+    }
+
+    .detail-list dt {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .detail-list dd {
+      margin: 0;
+    }
+
+    .request-file,
+    .upload-box,
+    .mail-template,
+    .submission-row {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+    }
+
+    .request-file {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+    }
+
+    .download-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 0 12px;
+      color: #115e59;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    input, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--ink);
+      background: #ffffff;
+    }
+
+    input {
+      min-height: 36px;
+      padding: 0 10px;
+    }
+
+    textarea {
+      min-height: 126px;
+      padding: 10px;
+      line-height: 1.45;
+      resize: vertical;
+    }
+
+    .template-actions, .row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .submission-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 900px) {
+      .split-layout,
+      .participant-layout,
+      .login-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .session-bar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .topbar, .request-file {
+        align-items: flex-start;
+        grid-template-columns: 1fr;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav class="session-bar hidden" id="sessionBar" aria-label="로그인 상태">
+    <div>
+      <strong id="sessionTitle">로그인</strong>
+      <span id="sessionSubtitle">역할 선택 전</span>
+    </div>
+    <button data-action="logout">로그아웃</button>
+  </nav>
+  <div class="action-bar" id="message">입찰 참여자는 로그인하거나 가입하세요.</div>
+
+  <main class="workspace">
+    <section id="loginView" class="login-screen">
+      <header class="topbar">
+        <div class="login-copy">
+          <h1>크래프톤 입찰시스템</h1>
+        </div>
+      </header>
+
+      <section class="login-grid single" id="loginGrid" aria-label="로그인 유형 선택">
+        <section class="login-card auth-login" aria-label="입찰 참여자 로그인">
+          <strong>입찰 참여자 로그인</strong>
+          <div class="auth-tabs" aria-label="입찰 참여자 인증 선택">
+            <button class="auth-tab active" type="button" data-auth-tab="login">로그인</button>
+            <button class="auth-tab" type="button" data-auth-tab="signup">가입</button>
+          </div>
+          <div class="auth-panel" id="supplierLoginPanel">
+            <label>이메일<input name="supplierEmail" type="email" placeholder="업무용 이메일"></label>
+            <label>비밀번호<input name="supplierPassword" type="password" placeholder="비밀번호"></label>
+            <button data-login-role="supplier">로그인</button>
+          </div>
+          <div class="auth-panel hidden" id="supplierSignupPanel">
+            <label>이메일<input name="supplierSignupEmail" type="email" placeholder="업무용 이메일"></label>
+            <label>비밀번호<input name="supplierSignupPassword" type="password" placeholder="비밀번호"></label>
+            <label>비밀번호 확인<input name="supplierSignupPasswordConfirm" type="password" placeholder="비밀번호 확인"></label>
+            <p class="auth-note">가입한 로그인 정보는 14일 동안만 사용할 수 있습니다. 사용기간이 지나면 다시 가입해야 합니다.</p>
+            <p class="auth-note">계정 사용기간이 만료되었습니다. 다시 가입해 주세요.</p>
+            <button type="button" data-action="supplier-signup">가입</button>
+          </div>
+        </section>
+        <section class="login-card auth-login hidden" id="operatorLoginCard" aria-label="운영자 로그인">
+          <strong>운영자 로그인</strong>
+          <div class="auth-panel">
+            <label>운영자 이메일<input name="operatorEmail" type="email" placeholder="운영자 이메일"></label>
+            <label>비밀번호<input name="operatorPassword" type="password" placeholder="비밀번호"></label>
+            <button data-login-role="operator">운영자 로그인</button>
+          </div>
+        </section>
+      </section>
+    </section>
+
+    <section id="supplierView" class="hidden">
+      <section class="metric-row">
+        <article><strong>2</strong><span>공고 목록</span></article>
+      </section>
+
+      <section class="split-layout participant-layout">
+        <aside class="panel">
+          <h2>공고 목록</h2>
+          <div class="notice-list">
+            <button class="notice-choice active"><strong>사무실 네트워크 고도화</strong><span>정보기술 · 2026. 7. 5. · 입찰중</span></button>
+            <button class="notice-choice"><strong>완료된 보안 점검 용역</strong><span>시설관리 · 2026. 6. 10. · 평가중</span></button>
+          </div>
+        </aside>
+
+        <section class="panel">
+          <h2>사무실 네트워크 고도화</h2>
+          <p>사무실 네트워크 장비와 무선 환경을 개선합니다.</p>
+          <dl class="detail-list">
+            <div><dt>공고 기간</dt><dd>2026. 6. 22. 09:00 ~ 2026. 7. 5. 18:00 (한국시간)</dd></div>
+            <div><dt>상태</dt><dd><span class="status-pill live">입찰중</span></dd></div>
+          </dl>
+
+          <div class="request-file">
+            <div>
+              <strong>제안요청서</strong>
+              <span class="muted">사무실_네트워크_제안요청서.pdf · 340 KB</span>
+            </div>
+            <a class="download-link" download="사무실_네트워크_제안요청서.txt" href="data:text/plain;charset=utf-8,%EC%82%AC%EB%AC%B4%EC%8B%A4%20%EB%84%A4%ED%8A%B8%EC%9B%8C%ED%81%AC%20%EA%B3%A0%EB%8F%84%ED%99%94%20%EC%A0%9C%EC%95%88%EC%9A%94%EC%B2%AD%EC%84%9C">제안요청서 다운로드</a>
+          </div>
+
+          <div class="upload-box" id="supplierUpload">
+            <h3>제안서 파일 업로드</h3>
+            <input type="file" id="proposalFile">
+            <button id="submitProposal">제안서 제출</button>
+            <p class="muted">압축 파일로 제안서 파일을 제안하세요</p>
+          </div>
+
+          <div class="upload-box hidden" id="supplierSubmitted">
+            <h3>제출 완료</h3>
+            <p>이미 제출한 제안서: <strong id="submittedFileName">제안서.pdf</strong></p>
+            <span class="status-pill">제출 완료</span>
+            <input type="file" id="replacementProposalFile">
+            <button id="replaceProposal">파일 교체</button>
+            <p class="muted">마감 전까지 파일을 교체할 수 있습니다. 운영자는 최종 제출본만 평가합니다.</p>
+          </div>
+        </section>
+      </section>
+    </section>
+
+    <section id="operatorView" class="hidden">
+      <section class="metric-row">
+        <article><strong>2</strong><span>등록 공고</span></article>
+        <article><strong>1</strong><span>평가 가능 공고</span></article>
+        <article><strong id="noticeStatusMetric">입찰중</strong><span>현재 공고 상태</span></article>
+      </section>
+
+      <section class="split-layout">
+        <aside class="panel">
+          <h2>공고 목록</h2>
+          <div class="notice-list">
+            <button class="notice-choice active"><strong>사무실 네트워크 고도화</strong><span>정보기술 · 입찰중</span></button>
+            <button class="notice-choice"><strong>완료된 보안 점검 용역</strong><span>시설관리 · 평가중</span></button>
+          </div>
+        </aside>
+
+        <section class="panel">
+          <h2>새 공고 추가</h2>
+          <label>공고명<input value="신규 입찰 공고"></label>
+          <label>분야<input value="일반"></label>
+          <label>시작일 (한국시간)<input type="datetime-local" value="2026-06-22T09:00"></label>
+          <label>종료일 (한국시간)<input type="datetime-local" value="2026-07-05T18:00"></label>
+          <label>제안요청서 파일<input type="file"></label>
+          <button id="addNotice">공고 추가</button>
+
+          <div class="mail-template">
+            <h2>Outlook 메일 템플릿</h2>
+            <h3>입찰 안내 메일</h3>
+            <label>메일 제목<input id="inviteSubject" value="[입찰 안내] 사무실 네트워크 고도화"></label>
+            <label>메일 본문<textarea id="inviteBody">안녕하세요.
+
+아래 공고는 현재 입찰중입니다.
+
+공고명: 사무실 네트워크 고도화
+공고 기간: 2026. 6. 22. 09:00 ~ 2026. 7. 5. 18:00 (한국시간)
+제안요청서: 사무실_네트워크_제안요청서.pdf
+
+입찰 사이트에 방문하여 공고 내용을 확인하고 제안요청서를 다운로드한 뒤, 마감 전까지 제안서를 업로드해 주세요.
+
+본 메일은 Outlook에서 발송됩니다.</textarea></label>
+            <p class="muted">수정한 내용은 문안 저장 후 복사에 반영됩니다.</p>
+            <div class="template-actions">
+              <button data-save-template="inviteSubject inviteBody">문안 저장</button>
+              <button data-copy="inviteSubject">제목 복사</button>
+              <button data-copy="inviteBody">본문 복사</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>제출 파일 평가</h2>
+          <div class="request-file">
+            <div>
+              <strong>제안요청서</strong>
+              <span class="muted">사무실_네트워크_제안요청서.pdf · 340 KB</span>
+            </div>
+            <a class="download-link" download="사무실_네트워크_제안요청서.txt" href="data:text/plain;charset=utf-8,%EC%82%AC%EB%AC%B4%EC%8B%A4%20%EB%84%A4%ED%8A%B8%EC%9B%8C%ED%81%AC%20%EA%B3%A0%EB%8F%84%ED%99%94%20%EC%A0%9C%EC%95%88%EC%9A%94%EC%B2%AD%EC%84%9C">제안요청서 다운로드</a>
+          </div>
+          <div class="upload-box">
+            <h3>제안요청서 교체</h3>
+            <label>교체 파일<input type="file" id="replacementRfpFile"></label>
+            <button id="replaceRfpFile">제안요청서 교체</button>
+            <p class="muted">입찰 참여자는 최신 제안요청서만 다운로드합니다.</p>
+          </div>
+          <p><span class="status-pill warning">공고 기간 종료 후 열람 가능</span></p>
+          <div class="submission-row">
+            <div>
+              <strong>네트워크_제안서.pdf</strong>
+              <span class="muted">서울공급웍스 · 512 KB</span>
+              <a class="download-link" download="네트워크_제안서.pdf" href="data:text/plain;charset=utf-8,%EB%84%A4%ED%8A%B8%EC%9B%8C%ED%81%AC_%EC%A0%9C%EC%95%88%EC%84%9C.pdf">제안서 다운로드</a>
+            </div>
+            <label>평가 점수<input id="scoreA" data-evaluation-field data-evaluation-score-field type="number" min="0" max="100" value=""></label>
+            <label>평가 메모<input data-evaluation-field value=""></label>
+            <div class="row-actions">
+              <button data-evaluation-action>평가 저장</button>
+              <button id="selectPreferred" data-result-action disabled>우선대상자 선택</button>
+            </div>
+          </div>
+
+          <div class="submission-row">
+            <div>
+              <strong>부산파트너스_제안서.pdf</strong>
+              <span class="muted">부산제안파트너스 · 418 KB</span>
+              <a class="download-link" download="부산파트너스_제안서.pdf" href="data:text/plain;charset=utf-8,%EB%B6%80%EC%82%B0%ED%8C%8C%ED%8A%B8%EB%84%88%EC%8A%A4_%EC%A0%9C%EC%95%88%EC%84%9C.pdf">제안서 다운로드</a>
+            </div>
+            <label>평가 점수<input data-evaluation-field data-evaluation-score-field type="number" min="0" max="100" value=""></label>
+            <label>평가 메모<input data-evaluation-field value=""></label>
+            <div class="row-actions">
+              <button data-evaluation-action>평가 저장</button>
+              <button data-result-action disabled>우선대상자 선택</button>
+            </div>
+          </div>
+          <p id="evaluationRequiredNotice" class="muted">모든 제출 업체의 평가를 저장한 뒤 우선대상자를 선택할 수 있습니다.</p>
+          <p id="lockedEvaluationNotice" class="muted hidden">결과 통보 완료 후에는 평가를 수정할 수 없습니다.</p>
+
+          <div class="mail-template hidden" id="resultMail">
+            <h2>결과 통보 메일 문안</h2>
+            <h3>우선대상자 메일 문안 - 서울공급웍스</h3>
+            <label>메일 제목<input id="preferredSubject" value="[입찰 결과 안내] 사무실 네트워크 고도화 우선대상자 선정"></label>
+            <label>메일 본문<textarea id="preferredBody">서울공급웍스 담당자님,
+
+사무실 네트워크 고도화 공고 검토 결과 귀사가 우선대상자로 선정되었습니다.
+후속 협의 일정과 필요 서류는 별도 안내드리겠습니다.</textarea></label>
+
+            <h3>탈락자 메일 문안 - 부산제안파트너스</h3>
+            <label>메일 제목<input id="rejectedSubject" value="[입찰 결과 안내] 사무실 네트워크 고도화"></label>
+            <label>메일 본문<textarea id="rejectedBody">부산제안파트너스 담당자님,
+
+사무실 네트워크 고도화 공고 검토 결과 아쉽게도 이번 입찰에서는 탈락 처리되었습니다.
+소중한 제안서를 제출해 주셔서 감사드립니다.</textarea></label>
+            <p class="muted">수정한 내용은 문안 저장 후 복사에 반영됩니다.</p>
+
+            <div class="template-actions">
+              <button data-save-template="preferredSubject preferredBody rejectedSubject rejectedBody">문안 저장</button>
+              <button data-copy="preferredSubject">우선대상자 제목 복사</button>
+              <button data-copy="preferredBody">우선대상자 본문 복사</button>
+              <button data-copy="rejectedSubject">탈락자 제목 복사</button>
+              <button data-copy="rejectedBody">탈락자 본문 복사</button>
+              <button id="completeNotice">통보 완료</button>
+            </div>
+          </div>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const message = document.querySelector('#message');
+    const loginView = document.querySelector('#loginView');
+    const supplierView = document.querySelector('#supplierView');
+    const operatorView = document.querySelector('#operatorView');
+    const sessionBar = document.querySelector('#sessionBar');
+    const sessionTitle = document.querySelector('#sessionTitle');
+    const sessionSubtitle = document.querySelector('#sessionSubtitle');
+    const loginGrid = document.querySelector('#loginGrid');
+    const operatorLoginCard = document.querySelector('#operatorLoginCard');
+    const supplierLoginPanel = document.querySelector('#supplierLoginPanel');
+    const supplierSignupPanel = document.querySelector('#supplierSignupPanel');
+    const savedTemplateText = new Map();
+    let prototypeSupplierAccount = null;
+
+    function readInput(name) {
+      return document.querySelector(`[name="${name}"]`)?.value.trim() || '';
+    }
+
+    function createSupplierExpiry() {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 14);
+      return expiresAt;
+    }
+
+    function canShowOperatorLogin() {
+      const operatorQuery = window.location.search.includes('operator=1');
+      const operatorPath = window.location.pathname.replace(/\/+$/, '').endsWith('/operator');
+      const operatorHash = window.location.hash === '#operator';
+      return operatorQuery || operatorPath || operatorHash;
+    }
+
+    function applyOperatorAccessGate() {
+      const allowed = canShowOperatorLogin();
+      operatorLoginCard.classList.toggle('hidden', !canShowOperatorLogin());
+      loginGrid.classList.toggle('single', !allowed);
+    }
+
+    function showSupplierAuthTab(mode) {
+      const signup = mode === 'signup';
+      supplierLoginPanel.classList.toggle('hidden', signup);
+      supplierSignupPanel.classList.toggle('hidden', !signup);
+      document.querySelectorAll('[data-auth-tab]').forEach((button) => {
+        button.classList.toggle('active', button.dataset.authTab === mode);
+      });
+      message.textContent = signup
+        ? '가입한 로그인 정보는 14일 동안만 사용할 수 있습니다.'
+        : '이메일과 비밀번호로 로그인하세요.';
+    }
+
+    function handleSupplierSignup() {
+      const email = readInput('supplierSignupEmail');
+      const password = readInput('supplierSignupPassword');
+      const passwordConfirm = readInput('supplierSignupPasswordConfirm');
+      if (!email || !password || !passwordConfirm) {
+        message.textContent = '이메일과 비밀번호를 입력하세요.';
+        return;
+      }
+      if (password !== passwordConfirm) {
+        message.textContent = '비밀번호가 일치하지 않습니다.';
+        return;
+      }
+      prototypeSupplierAccount = {
+        email,
+        password,
+        expiresAt: createSupplierExpiry(),
+      };
+      document.querySelector('[name="supplierEmail"]').value = email;
+      document.querySelector('[name="supplierPassword"]').value = '';
+      showSupplierAuthTab('login');
+      message.textContent = '가입되었습니다. 가입한 로그인 정보는 14일 동안만 사용할 수 있습니다. 이메일과 비밀번호로 로그인하세요.';
+    }
+
+    function handleSupplierLogin() {
+      const email = readInput('supplierEmail');
+      const password = readInput('supplierPassword');
+      if (!prototypeSupplierAccount) {
+        showSupplierAuthTab('signup');
+        message.textContent = '먼저 가입해 주세요.';
+        return;
+      }
+      if (prototypeSupplierAccount.expiresAt.getTime() <= Date.now()) {
+        showSupplierAuthTab('signup');
+        message.textContent = '계정 사용기간이 만료되었습니다. 다시 가입해 주세요.';
+        return;
+      }
+      if (email !== prototypeSupplierAccount.email || password !== prototypeSupplierAccount.password) {
+        message.textContent = '이메일 또는 비밀번호를 확인하세요.';
+        return;
+      }
+      loginAs('supplier');
+    }
+
+    function handleOperatorLogin() {
+      const email = readInput('operatorEmail');
+      const password = readInput('operatorPassword');
+      if (!email || !password) {
+        message.textContent = '운영자 이메일과 비밀번호를 입력하세요.';
+        return;
+      }
+      loginAs('operator');
+    }
+
+    function showLogin() {
+      loginView.classList.remove('hidden');
+      supplierView.classList.add('hidden');
+      operatorView.classList.add('hidden');
+      sessionBar.classList.add('hidden');
+      message.classList.remove('hidden');
+      message.textContent = canShowOperatorLogin()
+        ? '운영자 이메일과 비밀번호로 로그인하세요.'
+        : '입찰 참여자는 로그인하거나 가입하세요.';
+      applyOperatorAccessGate();
+    }
+
+    function loginAs(role) {
+      if (role === 'operator' && !canShowOperatorLogin()) return;
+      const operator = role === 'operator';
+      loginView.classList.add('hidden');
+      supplierView.classList.toggle('hidden', operator);
+      operatorView.classList.toggle('hidden', !operator);
+      sessionBar.classList.remove('hidden');
+      sessionTitle.textContent = operator ? '운영자' : '입찰 참여자';
+      sessionSubtitle.textContent = operator ? '플랫폼' : '서울공급웍스';
+      message.classList.toggle('hidden', operator);
+      if (!operator) {
+        message.textContent = '입찰 공고를 선택하고 제안요청서를 내려받은 뒤 제안서를 제출하세요.';
+      }
+    }
+
+    document.querySelectorAll('[data-login-role]').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (button.dataset.loginRole === 'supplier') {
+          handleSupplierLogin();
+          return;
+        }
+        handleOperatorLogin();
+      });
+    });
+    document.querySelectorAll('[data-auth-tab]').forEach((button) => {
+      button.addEventListener('click', () => showSupplierAuthTab(button.dataset.authTab));
+    });
+    document.querySelector('[data-action="supplier-signup"]').addEventListener('click', handleSupplierSignup);
+    applyOperatorAccessGate();
+
+    document.querySelector('[data-action="logout"]').addEventListener('click', showLogin);
+
+    document.querySelector('#submitProposal').addEventListener('click', () => {
+      const file = document.querySelector('#proposalFile').files[0];
+      document.querySelector('#submittedFileName').textContent = file ? file.name : '제안서.pdf';
+      document.querySelector('#supplierUpload').classList.add('hidden');
+      document.querySelector('#supplierSubmitted').classList.remove('hidden');
+      message.textContent = '제안서가 제출되었습니다. 운영자는 공고 기간 종료 후 파일을 열람할 수 있습니다.';
+    });
+
+    document.querySelector('#replaceProposal').addEventListener('click', () => {
+      const file = document.querySelector('#replacementProposalFile').files[0];
+      document.querySelector('#submittedFileName').textContent = file ? file.name : '교체된_제안서.zip';
+      message.textContent = '제안서 파일이 교체되었습니다. 운영자는 최종 제출본만 평가합니다.';
+    });
+
+    document.querySelector('#addNotice').addEventListener('click', () => {
+      message.textContent = '공고가 추가되었고 상태는 입찰중입니다.';
+    });
+
+    document.querySelector('#replaceRfpFile').addEventListener('click', () => {
+      const file = document.querySelector('#replacementRfpFile').files[0];
+      message.classList.remove('hidden');
+      message.textContent = file
+        ? '제안요청서가 최신 파일로 교체되었습니다. 입찰 참여자는 최신 제안요청서만 다운로드합니다.'
+        : '교체할 제안요청서 파일을 선택하세요.';
+    });
+
+    function refreshResultActions() {
+      const scoresComplete = Array.from(document.querySelectorAll('[data-evaluation-score-field]'))
+        .every((field) => field.value.trim() !== '');
+      document.querySelectorAll('[data-result-action]').forEach((control) => {
+        control.disabled = !scoresComplete;
+      });
+      document.querySelector('#evaluationRequiredNotice').classList.toggle('hidden', scoresComplete);
+    }
+
+    document.querySelectorAll('[data-evaluation-score-field]').forEach((field) => {
+      field.addEventListener('input', refreshResultActions);
+    });
+    refreshResultActions();
+
+    document.querySelector('#selectPreferred').addEventListener('click', () => {
+      document.querySelector('#resultMail').classList.remove('hidden');
+      document.querySelector('#noticeStatusMetric').textContent = '결과 통보 대기';
+      message.textContent = '우선대상자를 선택했습니다. 결과 통보 메일 문안을 Outlook에서 발송하세요.';
+    });
+
+    document.querySelector('#completeNotice').addEventListener('click', () => {
+      document.querySelector('#noticeStatusMetric').textContent = '통보 완료';
+      document.querySelector('#lockedEvaluationNotice').classList.remove('hidden');
+      document.querySelectorAll('[data-evaluation-action], [data-result-action], [data-evaluation-field]').forEach((control) => {
+        control.disabled = true;
+      });
+      message.textContent = 'Outlook 결과 통보 완료 상태가 기록되었습니다.';
+    });
+
+    document.querySelectorAll('[data-copy]').forEach((button) => {
+      const source = document.querySelector(`#${button.dataset.copy}`);
+      if (source && !savedTemplateText.has(button.dataset.copy)) {
+        savedTemplateText.set(button.dataset.copy, source.value);
+      }
+    });
+
+    document.querySelectorAll('[data-save-template]').forEach((button) => {
+      button.addEventListener('click', () => {
+        button.dataset.saveTemplate.split(' ').filter(Boolean).forEach((sourceId) => {
+          const source = document.querySelector(`#${sourceId}`);
+          savedTemplateText.set(sourceId, source?.value || '');
+        });
+        message.classList.remove('hidden');
+        message.textContent = 'Outlook 메일 문안이 저장되었습니다. 복사 버튼은 저장된 문안만 사용합니다.';
+      });
+    });
+
+    document.querySelectorAll('[data-copy]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const source = document.querySelector(`#${button.dataset.copy}`);
+        const text = savedTemplateText.get(button.dataset.copy) ?? source.value;
+        try {
+          await navigator.clipboard.writeText(text);
+          message.textContent = '저장된 Outlook 문안을 복사했습니다.';
+        } catch {
+          if (source.value !== text) source.value = text;
+          source.select();
+          message.textContent = '선택된 문안을 복사해서 Outlook에 붙여넣으세요.';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

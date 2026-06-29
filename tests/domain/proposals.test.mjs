@@ -15,7 +15,6 @@ const publishedNotice = createBidNotice({
   category: 'IT',
   requirements: 'Build ERP MVP.',
   deadlineAt: '2026-07-01T00:00:00.000Z',
-  evaluationCriteria: 'Price 40, technical 40, schedule 20',
   createdByMemberId: 'buyer',
   status: NoticeStatus.Published,
 });
@@ -55,7 +54,7 @@ test('supplier cannot submit twice to the same notice', () => {
 
   assert.throws(
     () => submitProposal({ actor: supplier, supplierCompany, notice: publishedNotice, existingProposals: [existing], input: { id: 'proposal-new', price: 5100000, deliverySchedule: '40 days', proposalText: 'New proposal' }, now }),
-    /one active proposal/
+    /진행 중인 제안을 하나만/
   );
 });
 
@@ -75,5 +74,5 @@ test('supplier updates and withdraws own proposal before deadline only', () => {
 
   assert.equal(updated.price, 4900000);
   assert.equal(withdrawn.status, ProposalStatus.Withdrawn);
-  assert.throws(() => updateProposal({ actor: supplier, notice: publishedNotice, proposal: submitted, input: { price: 4800000 }, now: '2026-07-02T00:00:00.000Z' }), /after the deadline/);
+  assert.throws(() => updateProposal({ actor: supplier, notice: publishedNotice, proposal: submitted, input: { price: 4800000 }, now: '2026-07-02T00:00:00.000Z' }), /마감 이후/);
 });

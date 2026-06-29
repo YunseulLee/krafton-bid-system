@@ -1,5 +1,16 @@
 import { CompanyStatus, MemberStatus, NoticeStatus, ProposalStatus, ReportStatus } from './constants.js';
 
+function createFileMetadata(file) {
+  if (!file?.name) return null;
+  return {
+    name: file.name,
+    size: file.size || 0,
+    type: file.type || 'application/octet-stream',
+    lastModified: file.lastModified ?? null,
+    url: file.url || '',
+  };
+}
+
 export function createCompany(input) {
   const now = input.createdAt || new Date().toISOString();
   return {
@@ -40,8 +51,9 @@ export function createBidNotice(input) {
     requirements: input.requirements,
     budgetMin: input.budgetMin || null,
     budgetMax: input.budgetMax || null,
+    startsAt: input.startsAt || null,
     deadlineAt: input.deadlineAt,
-    evaluationCriteria: input.evaluationCriteria,
+    requestFile: createFileMetadata(input.requestFile),
     attachmentRequirements: input.attachmentRequirements || [],
     status: input.status || NoticeStatus.Draft,
     createdByMemberId: input.createdByMemberId,
@@ -52,6 +64,7 @@ export function createBidNotice(input) {
     publishedAt: input.publishedAt || null,
     closedAt: input.closedAt || null,
     awardedAt: input.awardedAt || null,
+    resultNotifiedAt: input.resultNotifiedAt || null,
   };
 }
 
@@ -66,6 +79,9 @@ export function createProposal(input) {
     proposalText: input.proposalText,
     attachmentIds: input.attachmentIds || [],
     status: input.status || ProposalStatus.Draft,
+    file: createFileMetadata(input.file),
+    fileHistory: input.fileHistory || [],
+    submittedByMemberId: input.submittedByMemberId || null,
     submittedAt: input.submittedAt || null,
     withdrawnAt: input.withdrawnAt || null,
     createdAt: now,

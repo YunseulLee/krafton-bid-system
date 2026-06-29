@@ -31,7 +31,6 @@ const notice = createBidNotice({
   category: 'IT',
   requirements: 'Build system.',
   deadlineAt: '2026-07-01T00:00:00.000Z',
-  evaluationCriteria: 'Price 50, technical 50',
   createdByMemberId: buyer.id,
   status: NoticeStatus.Published,
 });
@@ -64,5 +63,5 @@ test('proposal visibility is limited to owning supplier, owning buyer, and opera
 });
 
 test('suspended companies are rejected for transactional actions', () => {
-  assert.throws(() => ensureActiveCompany({ ...supplierCompany, status: CompanyStatus.Suspended }), /suspended/);
+  assert.throws(() => ensureActiveCompany({ ...supplierCompany, status: CompanyStatus.Suspended }), /정지된 업체/);
 });

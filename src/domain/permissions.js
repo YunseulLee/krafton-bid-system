@@ -2,8 +2,8 @@ import { CompanyStatus, CompanyType, MemberRole, NoticeStatus } from './constant
 import { assertRule } from './errors.js';
 
 export function ensureActiveCompany(company) {
-  assertRule(company.status !== CompanyStatus.Suspended, 'COMPANY_SUSPENDED', 'suspended companies cannot take new transactional actions.');
-  assertRule(company.status === CompanyStatus.Approved, 'COMPANY_NOT_APPROVED', 'Company must be approved before taking this action.');
+  assertRule(company.status !== CompanyStatus.Suspended, 'COMPANY_SUSPENDED', '정지된 업체는 새 거래 작업을 수행할 수 없습니다.');
+  assertRule(company.status === CompanyStatus.Approved, 'COMPANY_NOT_APPROVED', '이 작업을 수행하려면 업체 승인이 필요합니다.');
   return true;
 }
 

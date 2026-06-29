@@ -4,7 +4,7 @@ import { createActivityLog } from './model.js';
 import { transitionNotice } from './bid-notices.js';
 
 function assertOperator(actor) {
-  assertRule(actor.role === MemberRole.Operator, 'ONLY_OPERATORS', 'Only operators can perform this moderation action.');
+  assertRule(actor.role === MemberRole.Operator, 'ONLY_OPERATORS', '운영자만 이 관리 작업을 수행할 수 있습니다.');
 }
 
 function activity({ actor, targetType, targetId, action, metadata, now }) {

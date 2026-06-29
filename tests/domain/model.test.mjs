@@ -28,7 +28,6 @@ test('company, member, notice, and proposal factories set required defaults', ()
     category: 'Construction',
     requirements: 'Repair loading dock and floor.',
     deadlineAt: '2026-07-15T09:00:00.000Z',
-    evaluationCriteria: 'Price 40, technical 40, schedule 20',
     createdByMemberId: buyer.id,
   });
 
@@ -45,6 +44,7 @@ test('company, member, notice, and proposal factories set required defaults', ()
   assert.equal(buyer.status, 'Active');
   assert.equal(notice.status, NoticeStatus.Draft);
   assert.equal(proposal.status, ProposalStatus.Draft);
+  assert.equal(notice.requestFile, null);
   assert.deepEqual(notice.attachmentRequirements, []);
   assert.deepEqual(proposal.attachmentIds, []);
 });

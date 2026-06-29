@@ -4,16 +4,16 @@ import { createEvaluation } from './model.js';
 import { transitionNotice } from './bid-notices.js';
 
 function assertScore(score, label) {
-  assertRule(Number.isFinite(score) && score >= 0 && score <= 100, 'INVALID_SCORE', `${label} score must be between 0 and 100.`);
+  assertRule(Number.isFinite(score) && score >= 0 && score <= 100, 'INVALID_SCORE', `${label} 점수는 0점 이상 100점 이하여야 합니다.`);
 }
 
 export function recordEvaluation({ id, notice, proposal, evaluator, priceScore, technicalScore, scheduleScore, note, now = new Date().toISOString() }) {
-  assertRule(evaluator.role === MemberRole.Buyer, 'ONLY_BUYERS_EVALUATE', 'Only buyers can evaluate proposals.');
-  assertRule(evaluator.companyId === notice.buyerCompanyId, 'NOTICE_OWNER_REQUIRED', 'Buyers can evaluate only their own notices.');
-  assertRule(proposal.bidNoticeId === notice.id, 'PROPOSAL_NOTICE_MISMATCH', 'Proposal must belong to the notice being evaluated.');
-  assertScore(priceScore, 'Price');
-  assertScore(technicalScore, 'Technical');
-  assertScore(scheduleScore, 'Schedule');
+  assertRule(evaluator.role === MemberRole.Buyer, 'ONLY_BUYERS_EVALUATE', '구매자만 제안을 평가할 수 있습니다.');
+  assertRule(evaluator.companyId === notice.buyerCompanyId, 'NOTICE_OWNER_REQUIRED', '구매자는 자기 회사 공고의 제안만 평가할 수 있습니다.');
+  assertRule(proposal.bidNoticeId === notice.id, 'PROPOSAL_NOTICE_MISMATCH', '평가 대상 제안은 해당 공고에 속해야 합니다.');
+  assertScore(priceScore, '가격');
+  assertScore(technicalScore, '기술');
+  assertScore(scheduleScore, '일정');
 
   return createEvaluation({
     id,
@@ -31,15 +31,15 @@ export function recordEvaluation({ id, notice, proposal, evaluator, priceScore, 
 }
 
 export function awardNotice({ notice, proposals, selectedProposalId, actor, awardReason, now = new Date().toISOString() }) {
-  assertRule(actor.role === MemberRole.Buyer, 'ONLY_BUYERS_AWARD', 'Only buyers can award notices.');
-  assertRule(actor.companyId === notice.buyerCompanyId, 'NOTICE_OWNER_REQUIRED', 'Buyers can award only their own notices.');
-  assertRule(notice.status === NoticeStatus.Evaluating, 'NOTICE_NOT_EVALUATING', 'A notice must be evaluating before it can be awarded.');
+  assertRule(actor.role === MemberRole.Buyer, 'ONLY_BUYERS_AWARD', '구매자만 낙찰을 선정할 수 있습니다.');
+  assertRule(actor.companyId === notice.buyerCompanyId, 'NOTICE_OWNER_REQUIRED', '구매자는 자기 회사 공고만 낙찰 처리할 수 있습니다.');
+  assertRule(notice.status === NoticeStatus.Evaluating, 'NOTICE_NOT_EVALUATING', '평가중 상태의 공고만 낙찰 처리할 수 있습니다.');
 
   const submittedProposals = proposals.filter((proposal) => proposal.status === ProposalStatus.Submitted);
-  assertRule(submittedProposals.length > 0, 'NO_SUBMITTED_PROPOSALS', 'A notice cannot be awarded unless it has at least one submitted proposal.');
+  assertRule(submittedProposals.length > 0, 'NO_SUBMITTED_PROPOSALS', '제출된 제안이 하나 이상 있어야 낙찰 처리할 수 있습니다.');
 
   const selectedProposal = submittedProposals.find((proposal) => proposal.id === selectedProposalId);
-  assertRule(Boolean(selectedProposal), 'SELECTED_PROPOSAL_NOT_SUBMITTED', 'Only a submitted proposal can be selected.');
+  assertRule(Boolean(selectedProposal), 'SELECTED_PROPOSAL_NOT_SUBMITTED', '제출된 제안만 낙찰 대상으로 선택할 수 있습니다.');
 
   const awardedNotice = {
     ...transitionNotice(notice, NoticeStatus.Awarded, now),

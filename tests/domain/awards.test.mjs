@@ -12,7 +12,6 @@ const notice = createBidNotice({
   category: 'IT',
   requirements: 'Build ERP.',
   deadlineAt: '2026-07-01T00:00:00.000Z',
-  evaluationCriteria: 'Price 40, technical 40, schedule 20',
   createdByMemberId: buyer.id,
   status: NoticeStatus.Evaluating,
 });
@@ -54,6 +53,6 @@ test('buyer awards exactly one submitted proposal and marks others not selected'
 test('notice with no submitted proposals cannot be awarded', () => {
   assert.throws(
     () => awardNotice({ notice, proposals: [], selectedProposalId: 'missing', actor: buyer, awardReason: 'No proposal', now: '2026-07-02T00:00:00.000Z' }),
-    /at least one submitted proposal/
+    /제출된 제안이 하나 이상/
   );
 });

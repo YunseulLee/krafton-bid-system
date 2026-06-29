@@ -16,7 +16,6 @@ test('store supports publish, proposal submission, evaluation, award, and suppli
     budgetMin: 10000000,
     budgetMax: 20000000,
     deadlineAt: '2026-07-10T00:00:00.000Z',
-    evaluationCriteria: 'Price 40, technical 40, schedule 20',
     attachmentRequirements: ['Company profile'],
   });
   const published = store.publishNotice('member-buyer-1', draft.id, '2026-06-22T00:00:00.000Z');
@@ -36,7 +35,7 @@ test('store supports publish, proposal submission, evaluation, award, and suppli
   const restored = store.restoreNotice('member-operator-1', 'notice-seed-1', '2026-07-11T05:00:00.000Z');
 
   assert.equal(award.notice.status, NoticeStatus.Awarded);
-  assert.equal(store.getProposalForSupplier('member-supplier-1', proposal.id).status, ProposalStatus.Selected);
+  assert.equal(store.getProposalForSupplier('member-supplier-1', proposal.id).status, ProposalStatus.Submitted);
   assert.equal(saved.noticeId, 'notice-seed-1');
   assert.equal(store.listSavedNotices('member-supplier-1').length, 1);
   assert.equal(hidden.notice.status, NoticeStatus.Hidden);
@@ -53,7 +52,6 @@ test('store rejects notice creation by non-buyers', () => {
     category: 'IT',
     requirements: 'This should not be allowed.',
     deadlineAt: '2026-07-10T00:00:00.000Z',
-    evaluationCriteria: 'Price 50, technical 50',
   }), { code: 'ONLY_BUYERS_CREATE_NOTICES' });
 });
 

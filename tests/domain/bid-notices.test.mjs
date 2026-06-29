@@ -30,7 +30,6 @@ function buyerFixture() {
     category: 'Facility',
     requirements: 'Daily cleaning for HQ.',
     deadlineAt: '2026-07-01T00:00:00.000Z',
-    evaluationCriteria: 'Price 50, service 50',
     createdByMemberId: member.id,
   });
   return { company, member, notice };
@@ -51,7 +50,7 @@ test('publishing rejects incomplete notices', () => {
 
   assert.throws(
     () => publishNotice({ notice: incomplete, actor: member, buyerCompany: company, now }),
-    /title, category, requirements, deadline, and evaluation criteria/
+    /제목, 카테고리, 요구사항, 마감일/
   );
 });
 
@@ -63,5 +62,5 @@ test('notice transitions follow the allowed sequence', () => {
 
   assert.equal(closed.status, NoticeStatus.Closed);
   assert.equal(evaluating.status, NoticeStatus.Evaluating);
-  assert.throws(() => transitionNotice(notice, NoticeStatus.Awarded, now), /not allowed/);
+  assert.throws(() => transitionNotice(notice, NoticeStatus.Awarded, now), /변경할 수 없습니다/);
 });

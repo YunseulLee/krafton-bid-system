@@ -15,7 +15,7 @@ export function transitionNotice(notice, nextStatus, now = new Date().toISOStrin
   assertRule(
     allowed.has(nextStatus),
     'NOTICE_TRANSITION_BLOCKED',
-    `Transition from ${notice.status} to ${nextStatus} is not allowed.`
+    `${notice.status} 상태에서 ${nextStatus} 상태로 변경할 수 없습니다.`
   );
 
   return {
@@ -29,16 +29,16 @@ export function transitionNotice(notice, nextStatus, now = new Date().toISOStrin
 }
 
 export function publishNotice({ notice, actor, buyerCompany, now = new Date().toISOString() }) {
-  assertRule(actor.role === MemberRole.Buyer, 'ONLY_BUYERS_PUBLISH', 'Only buyers can publish notices.');
-  assertRule(actor.companyId === notice.buyerCompanyId, 'NOTICE_OWNER_REQUIRED', 'Buyers can publish only their own company notices.');
-  assertRule(buyerCompany.type === CompanyType.Buyer, 'BUYER_COMPANY_REQUIRED', 'Only buyer companies can publish notices.');
-  assertRule(buyerCompany.status === CompanyStatus.Approved, 'COMPANY_NOT_APPROVED', 'Buyer company must be approved before publishing.');
+  assertRule(actor.role === MemberRole.Buyer, 'ONLY_BUYERS_PUBLISH', '구매자만 공고를 게시할 수 있습니다.');
+  assertRule(actor.companyId === notice.buyerCompanyId, 'NOTICE_OWNER_REQUIRED', '구매자는 자기 회사 공고만 게시할 수 있습니다.');
+  assertRule(buyerCompany.type === CompanyType.Buyer, 'BUYER_COMPANY_REQUIRED', '구매 업체만 공고를 게시할 수 있습니다.');
+  assertRule(buyerCompany.status === CompanyStatus.Approved, 'COMPANY_NOT_APPROVED', '공고를 게시하려면 구매 업체 승인이 필요합니다.');
   assertRule(
-    Boolean(notice.title && notice.category && notice.requirements && notice.deadlineAt && notice.evaluationCriteria),
+    Boolean(notice.title && notice.category && notice.requirements && notice.deadlineAt),
     'NOTICE_INCOMPLETE',
-    'A notice cannot be published without a title, category, requirements, deadline, and evaluation criteria.'
+    '제목, 카테고리, 요구사항, 마감일이 있어야 공고를 게시할 수 있습니다.'
   );
-  assertRule(new Date(notice.deadlineAt).getTime() > new Date(now).getTime(), 'DEADLINE_PAST', 'Deadline must be in the future.');
+  assertRule(new Date(notice.deadlineAt).getTime() > new Date(now).getTime(), 'DEADLINE_PAST', '마감일은 현재 시점 이후여야 합니다.');
 
   return transitionNotice(notice, NoticeStatus.Published, now);
 }

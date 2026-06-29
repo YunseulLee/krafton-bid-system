@@ -14,7 +14,6 @@ const publishedNotice = createBidNotice({
   category: 'Facility',
   requirements: 'Daily cleaning.',
   deadlineAt: '2026-07-01T00:00:00.000Z',
-  evaluationCriteria: 'Price 50, service 50',
   createdByMemberId: 'buyer',
   status: NoticeStatus.Published,
 });
@@ -26,7 +25,7 @@ test('operator approves and suspends companies', () => {
   assert.equal(approved.company.status, CompanyStatus.Approved);
   assert.equal(suspended.company.status, CompanyStatus.Suspended);
   assert.equal(approved.activity.action, 'CompanyApproved');
-  assert.throws(() => approveCompany({ company: pendingCompany, actor: nonOperator }), /Only operators/);
+  assert.throws(() => approveCompany({ company: pendingCompany, actor: nonOperator }), /운영자만/);
 });
 
 test('operator hides and restores notices', () => {

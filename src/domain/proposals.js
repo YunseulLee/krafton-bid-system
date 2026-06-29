@@ -15,7 +15,7 @@ export function submitProposal({ actor, supplierCompany, notice, existingProposa
   assertRule(
     canSubmitProposal({ actor, supplierCompany, notice, now }),
     'PROPOSAL_SUBMISSION_BLOCKED',
-    'Supplier can submit proposals only to published notices before the deadline.'
+    '공급사는 마감 전 게시된 공고에만 제안을 제출할 수 있습니다.'
   );
 
   const hasActiveProposal = existingProposals.some(
@@ -24,7 +24,7 @@ export function submitProposal({ actor, supplierCompany, notice, existingProposa
       proposal.supplierCompanyId === supplierCompany.id &&
       proposal.status !== ProposalStatus.Withdrawn
   );
-  assertRule(!hasActiveProposal, 'ACTIVE_PROPOSAL_EXISTS', 'A supplier cannot submit more than one active proposal to the same notice.');
+  assertRule(!hasActiveProposal, 'ACTIVE_PROPOSAL_EXISTS', '같은 공고에는 진행 중인 제안을 하나만 제출할 수 있습니다.');
 
   return createProposal({
     id: input.id,
@@ -42,9 +42,9 @@ export function submitProposal({ actor, supplierCompany, notice, existingProposa
 }
 
 export function updateProposal({ actor, notice, proposal, input, now = new Date().toISOString() }) {
-  assertRule(actor.companyId === proposal.supplierCompanyId, 'PROPOSAL_OWNER_REQUIRED', 'Suppliers can update only their own proposals.');
-  assertRule(proposal.status === ProposalStatus.Submitted, 'PROPOSAL_NOT_SUBMITTED', 'Only submitted proposals can be updated.');
-  assertRule(beforeDeadline(notice, now), 'DEADLINE_PASSED', 'A supplier cannot update a proposal after the deadline.');
+  assertRule(actor.companyId === proposal.supplierCompanyId, 'PROPOSAL_OWNER_REQUIRED', '공급사는 자기 회사 제안만 수정할 수 있습니다.');
+  assertRule(proposal.status === ProposalStatus.Submitted, 'PROPOSAL_NOT_SUBMITTED', '제출된 제안만 수정할 수 있습니다.');
+  assertRule(beforeDeadline(notice, now), 'DEADLINE_PASSED', '마감 이후에는 제안을 수정할 수 없습니다.');
 
   return {
     ...proposal,
@@ -57,9 +57,9 @@ export function updateProposal({ actor, notice, proposal, input, now = new Date(
 }
 
 export function withdrawProposal({ actor, notice, proposal, now = new Date().toISOString() }) {
-  assertRule(actor.companyId === proposal.supplierCompanyId, 'PROPOSAL_OWNER_REQUIRED', 'Suppliers can withdraw only their own proposals.');
-  assertRule(proposal.status === ProposalStatus.Submitted, 'PROPOSAL_NOT_SUBMITTED', 'Only submitted proposals can be withdrawn.');
-  assertRule(beforeDeadline(notice, now), 'DEADLINE_PASSED', 'A supplier cannot withdraw a proposal after the deadline.');
+  assertRule(actor.companyId === proposal.supplierCompanyId, 'PROPOSAL_OWNER_REQUIRED', '공급사는 자기 회사 제안만 철회할 수 있습니다.');
+  assertRule(proposal.status === ProposalStatus.Submitted, 'PROPOSAL_NOT_SUBMITTED', '제출된 제안만 철회할 수 있습니다.');
+  assertRule(beforeDeadline(notice, now), 'DEADLINE_PASSED', '마감 이후에는 제안을 철회할 수 없습니다.');
 
   return {
     ...proposal,

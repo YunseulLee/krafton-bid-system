@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { test } from 'node:test';
+
+test('browser app starts with Supabase email login instead of direct role switching', async () => {
+  const appSource = await readFile('src/ui/app.js', 'utf8');
+
+  assert.match(appSource, /크래프톤 입찰시스템/);
+  assert.doesNotMatch(appSource, /입찰 시스템 로그인/);
+  assert.doesNotMatch(appSource, /국내용 입찰 시스템/);
+  assert.match(appSource, /name="email"/);
+  assert.match(appSource, /name="password"/);
+  assert.match(appSource, /data-auth-mode="login"/);
+  assert.match(appSource, /data-auth-mode="signup"/);
+  assert.match(appSource, /name="signupEmail"/);
+  assert.match(appSource, /name="signupPassword"/);
+  assert.match(appSource, /name="signupPasswordConfirm"/);
+  assert.match(appSource, /운영자 로그인/);
+  assert.match(appSource, /name="operatorEmail"/);
+  assert.match(appSource, /name="operatorPassword"/);
+  assert.match(appSource, /data-form="operator-login"/);
+  assert.match(appSource, /data-action="operator-login"/);
+  assert.match(appSource, /assertExpectedLoginRole/);
+  assert.match(appSource, /expectedRole:\s*'Operator'/);
+  assert.match(appSource, /운영자 계정으로 로그인하세요/);
+  assert.match(appSource, /비밀번호 확인/);
+  assert.match(appSource, /가입한 로그인 정보는 14일 동안만 사용할 수 있습니다/);
+  assert.match(appSource, /사용기간이 지나면 다시 가입해야 합니다/);
+  assert.match(appSource, /계정 사용기간이 만료되었습니다\. 다시 가입해 주세요/);
+  assert.match(appSource, /data-action="login"/);
+  assert.match(appSource, /data-action="signup"/);
+  assert.match(appSource, /signUpSupplier/);
+  assert.doesNotMatch(appSource, /auth-checklist/);
+  assert.doesNotMatch(appSource, /이메일\/비밀번호 확인/);
+  assert.doesNotMatch(appSource, /supplier 역할/);
+  assert.doesNotMatch(appSource, /업체 승인 완료/);
+  assert.match(appSource, /data-action="logout"/);
+  assert.match(appSource, /입찰 참여자는 로그인하거나 가입하세요/);
+  assert.doesNotMatch(appSource, /data-member-id/);
+  assert.doesNotMatch(appSource, /data-login-role/);
+  assert.doesNotMatch(appSource, /role-switcher/);
+});
