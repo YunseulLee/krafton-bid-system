@@ -3,7 +3,7 @@ const OPERATOR_ALLOWED_IPS = new Set([
   '103.114.126.34',
 ]);
 
-const DEFAULT_OPERATOR_LOGIN_REVIEW_MODE = true;
+const DEFAULT_OPERATOR_LOGIN_REVIEW_MODE = false;
 
 function normalizePathname(pathname) {
   const normalized = String(pathname || '/').replace(/\/+$/, '');

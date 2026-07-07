@@ -426,7 +426,7 @@
     </div>
     <button data-action="logout">로그아웃</button>
   </nav>
-  <div class="action-bar" id="message">입찰 참여자는 로그인하거나 가입하세요.</div>
+  <div class="action-bar" id="message">입찰자 또는 운영자 로그인을 선택하세요.</div>
 
   <main class="workspace">
     <section id="loginView" class="login-screen">
@@ -436,10 +436,22 @@
         </div>
       </header>
 
-      <section class="login-grid single" id="loginGrid" aria-label="로그인 유형 선택">
-        <section class="login-card auth-login" aria-label="입찰 참여자 로그인">
-          <strong>입찰 참여자 로그인</strong>
-          <div class="auth-tabs" aria-label="입찰 참여자 인증 선택">
+      <section class="login-grid" id="roleSelection" aria-label="접근 페이지 선택">
+        <button class="login-card auth-login" type="button" data-open-auth="supplier" aria-label="입찰자 로그인">
+          <strong>입찰자 로그인</strong>
+          <span>입찰 내용 확인 및 제안</span>
+        </button>
+        <button class="login-card auth-login" type="button" data-open-auth="operator" id="operatorEntryButton" aria-label="운영자 로그인">
+          <strong>운영자 로그인</strong>
+          <span>입찰목록 업로드 · 제안서 확인 및 검토</span>
+        </button>
+      </section>
+
+      <section class="login-grid single hidden" id="loginGrid" aria-label="로그인 유형 선택">
+        <section class="login-card auth-login hidden" id="supplierLoginCard" aria-label="입찰자 로그인">
+          <button type="button" data-open-auth="entry">이전</button>
+          <strong>입찰자 로그인</strong>
+          <div class="auth-tabs" aria-label="입찰자 인증 선택">
             <button class="auth-tab active" type="button" data-auth-tab="login">로그인</button>
             <button class="auth-tab" type="button" data-auth-tab="signup">가입</button>
           </div>
@@ -453,11 +465,11 @@
             <label>비밀번호<input name="supplierSignupPassword" type="password" placeholder="비밀번호"></label>
             <label>비밀번호 확인<input name="supplierSignupPasswordConfirm" type="password" placeholder="비밀번호 확인"></label>
             <p class="auth-note">가입한 로그인 정보는 14일 동안만 사용할 수 있습니다. 사용기간이 지나면 다시 가입해야 합니다.</p>
-            <p class="auth-note">계정 사용기간이 만료되었습니다. 다시 가입해 주세요.</p>
             <button type="button" data-action="supplier-signup">가입</button>
           </div>
         </section>
         <section class="login-card auth-login hidden" id="operatorLoginCard" aria-label="운영자 로그인">
+          <button type="button" data-open-auth="entry">이전</button>
           <strong>운영자 로그인</strong>
           <div class="auth-panel">
             <label>운영자 이메일<input name="operatorEmail" type="email" placeholder="운영자 이메일"></label>
@@ -470,36 +482,37 @@
 
     <section id="supplierView" class="hidden">
       <section class="metric-row">
-        <article><strong>2</strong><span>공고 목록</span></article>
+        <article><strong>2</strong><span>입찰목록</span></article>
       </section>
 
       <section class="split-layout participant-layout">
         <aside class="panel">
-          <h2>공고 목록</h2>
+          <h2>입찰목록</h2>
           <div class="notice-list">
-            <button class="notice-choice active"><strong>사무실 네트워크 고도화</strong><span>정보기술 · 2026. 7. 5. · 입찰중</span></button>
-            <button class="notice-choice"><strong>완료된 보안 점검 용역</strong><span>시설관리 · 2026. 6. 10. · 평가중</span></button>
+            <button class="notice-choice active" type="button" data-supplier-notice="active"><strong>사무실 네트워크 고도화</strong><span>정보기술 · 2026. 7. 5. · 입찰중</span></button>
+            <button class="notice-choice" type="button" data-supplier-notice="ended"><strong>완료된 보안 점검 용역</strong><span>시설관리 · 2026. 6. 10. · 평가중</span></button>
           </div>
         </aside>
 
         <section class="panel">
-          <h2>사무실 네트워크 고도화</h2>
-          <p>사무실 네트워크 장비와 무선 환경을 개선합니다.</p>
+          <h2>입찰 내용 확인 및 제안</h2>
+          <h3 id="supplierNoticeTitle">사무실 네트워크 고도화</h3>
+          <p id="supplierNoticeSummary">사무실 네트워크 장비와 무선 환경을 개선합니다.</p>
           <dl class="detail-list">
-            <div><dt>공고 기간</dt><dd>2026. 6. 22. 09:00 ~ 2026. 7. 5. 18:00 (한국시간)</dd></div>
-            <div><dt>상태</dt><dd><span class="status-pill live">입찰중</span></dd></div>
+            <div><dt>공고 기간</dt><dd id="supplierNoticePeriod">2026. 6. 22. 09:00 ~ 2026. 7. 5. 18:00 (한국시간)</dd></div>
+            <div><dt>상태</dt><dd><span class="status-pill live" id="supplierNoticeStatus">입찰중</span></dd></div>
           </dl>
 
           <div class="request-file">
             <div>
               <strong>제안요청서</strong>
-              <span class="muted">사무실_네트워크_제안요청서.pdf · 340 KB</span>
+              <span class="muted" id="supplierRfpName">사무실_네트워크_제안요청서.pdf · 340 KB</span>
             </div>
             <a class="download-link" download="사무실_네트워크_제안요청서.txt" href="data:text/plain;charset=utf-8,%EC%82%AC%EB%AC%B4%EC%8B%A4%20%EB%84%A4%ED%8A%B8%EC%9B%8C%ED%81%AC%20%EA%B3%A0%EB%8F%84%ED%99%94%20%EC%A0%9C%EC%95%88%EC%9A%94%EC%B2%AD%EC%84%9C">제안요청서 다운로드</a>
           </div>
 
           <div class="upload-box" id="supplierUpload">
-            <h3>제안서 파일 업로드</h3>
+            <h3>제안서 제출</h3>
             <input type="file" id="proposalFile">
             <button id="submitProposal">제안서 제출</button>
             <p class="muted">압축 파일로 제안서 파일을 제안하세요</p>
@@ -511,136 +524,13 @@
             <span class="status-pill">제출 완료</span>
             <input type="file" id="replacementProposalFile">
             <button id="replaceProposal">파일 교체</button>
-            <p class="muted">마감 전까지 파일을 교체할 수 있습니다. 운영자는 최종 제출본만 평가합니다.</p>
+            <p class="muted">마감 전까지 파일을 교체할 수 있습니다. 운영자는 최종 제출본만 평가하고, 교체 전 원본도 보관 이력으로 남습니다.</p>
           </div>
         </section>
       </section>
     </section>
 
-    <section id="operatorView" class="hidden">
-      <section class="metric-row">
-        <article><strong>2</strong><span>등록 공고</span></article>
-        <article><strong>1</strong><span>평가 가능 공고</span></article>
-        <article><strong id="noticeStatusMetric">입찰중</strong><span>현재 공고 상태</span></article>
-      </section>
-
-      <section class="split-layout">
-        <aside class="panel">
-          <h2>공고 목록</h2>
-          <div class="notice-list">
-            <button class="notice-choice active"><strong>사무실 네트워크 고도화</strong><span>정보기술 · 입찰중</span></button>
-            <button class="notice-choice"><strong>완료된 보안 점검 용역</strong><span>시설관리 · 평가중</span></button>
-          </div>
-        </aside>
-
-        <section class="panel">
-          <h2>새 공고 추가</h2>
-          <label>공고명<input value="신규 입찰 공고"></label>
-          <label>분야<input value="일반"></label>
-          <label>시작일 (한국시간)<input type="datetime-local" value="2026-06-22T09:00"></label>
-          <label>종료일 (한국시간)<input type="datetime-local" value="2026-07-05T18:00"></label>
-          <label>제안요청서 파일<input type="file"></label>
-          <button id="addNotice">공고 추가</button>
-
-          <div class="mail-template">
-            <h2>Outlook 메일 템플릿</h2>
-            <h3>입찰 안내 메일</h3>
-            <label>메일 제목<input id="inviteSubject" value="[입찰 안내] 사무실 네트워크 고도화"></label>
-            <label>메일 본문<textarea id="inviteBody">안녕하세요.
-
-아래 공고는 현재 입찰중입니다.
-
-공고명: 사무실 네트워크 고도화
-공고 기간: 2026. 6. 22. 09:00 ~ 2026. 7. 5. 18:00 (한국시간)
-제안요청서: 사무실_네트워크_제안요청서.pdf
-
-입찰 사이트에 방문하여 공고 내용을 확인하고 제안요청서를 다운로드한 뒤, 마감 전까지 제안서를 업로드해 주세요.
-
-본 메일은 Outlook에서 발송됩니다.</textarea></label>
-            <p class="muted">수정한 내용은 문안 저장 후 복사에 반영됩니다.</p>
-            <div class="template-actions">
-              <button data-save-template="inviteSubject inviteBody">문안 저장</button>
-              <button data-copy="inviteSubject">제목 복사</button>
-              <button data-copy="inviteBody">본문 복사</button>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <h2>제출 파일 평가</h2>
-          <div class="request-file">
-            <div>
-              <strong>제안요청서</strong>
-              <span class="muted">사무실_네트워크_제안요청서.pdf · 340 KB</span>
-            </div>
-            <a class="download-link" download="사무실_네트워크_제안요청서.txt" href="data:text/plain;charset=utf-8,%EC%82%AC%EB%AC%B4%EC%8B%A4%20%EB%84%A4%ED%8A%B8%EC%9B%8C%ED%81%AC%20%EA%B3%A0%EB%8F%84%ED%99%94%20%EC%A0%9C%EC%95%88%EC%9A%94%EC%B2%AD%EC%84%9C">제안요청서 다운로드</a>
-          </div>
-          <div class="upload-box">
-            <h3>제안요청서 교체</h3>
-            <label>교체 파일<input type="file" id="replacementRfpFile"></label>
-            <button id="replaceRfpFile">제안요청서 교체</button>
-            <p class="muted">입찰 참여자는 최신 제안요청서만 다운로드합니다.</p>
-          </div>
-          <p><span class="status-pill warning">공고 기간 종료 후 열람 가능</span></p>
-          <div class="submission-row">
-            <div>
-              <strong>네트워크_제안서.pdf</strong>
-              <span class="muted">서울공급웍스 · 512 KB</span>
-              <a class="download-link" download="네트워크_제안서.pdf" href="data:text/plain;charset=utf-8,%EB%84%A4%ED%8A%B8%EC%9B%8C%ED%81%AC_%EC%A0%9C%EC%95%88%EC%84%9C.pdf">제안서 다운로드</a>
-            </div>
-            <label>평가 점수<input id="scoreA" data-evaluation-field data-evaluation-score-field type="number" min="0" max="100" value=""></label>
-            <label>평가 메모<input data-evaluation-field value=""></label>
-            <div class="row-actions">
-              <button data-evaluation-action>평가 저장</button>
-              <button id="selectPreferred" data-result-action disabled>우선대상자 선택</button>
-            </div>
-          </div>
-
-          <div class="submission-row">
-            <div>
-              <strong>부산파트너스_제안서.pdf</strong>
-              <span class="muted">부산제안파트너스 · 418 KB</span>
-              <a class="download-link" download="부산파트너스_제안서.pdf" href="data:text/plain;charset=utf-8,%EB%B6%80%EC%82%B0%ED%8C%8C%ED%8A%B8%EB%84%88%EC%8A%A4_%EC%A0%9C%EC%95%88%EC%84%9C.pdf">제안서 다운로드</a>
-            </div>
-            <label>평가 점수<input data-evaluation-field data-evaluation-score-field type="number" min="0" max="100" value=""></label>
-            <label>평가 메모<input data-evaluation-field value=""></label>
-            <div class="row-actions">
-              <button data-evaluation-action>평가 저장</button>
-              <button data-result-action disabled>우선대상자 선택</button>
-            </div>
-          </div>
-          <p id="evaluationRequiredNotice" class="muted">모든 제출 업체의 평가를 저장한 뒤 우선대상자를 선택할 수 있습니다.</p>
-          <p id="lockedEvaluationNotice" class="muted hidden">결과 통보 완료 후에는 평가를 수정할 수 없습니다.</p>
-
-          <div class="mail-template hidden" id="resultMail">
-            <h2>결과 통보 메일 문안</h2>
-            <h3>우선대상자 메일 문안 - 서울공급웍스</h3>
-            <label>메일 제목<input id="preferredSubject" value="[입찰 결과 안내] 사무실 네트워크 고도화 우선대상자 선정"></label>
-            <label>메일 본문<textarea id="preferredBody">서울공급웍스 담당자님,
-
-사무실 네트워크 고도화 공고 검토 결과 귀사가 우선대상자로 선정되었습니다.
-후속 협의 일정과 필요 서류는 별도 안내드리겠습니다.</textarea></label>
-
-            <h3>탈락자 메일 문안 - 부산제안파트너스</h3>
-            <label>메일 제목<input id="rejectedSubject" value="[입찰 결과 안내] 사무실 네트워크 고도화"></label>
-            <label>메일 본문<textarea id="rejectedBody">부산제안파트너스 담당자님,
-
-사무실 네트워크 고도화 공고 검토 결과 아쉽게도 이번 입찰에서는 탈락 처리되었습니다.
-소중한 제안서를 제출해 주셔서 감사드립니다.</textarea></label>
-            <p class="muted">수정한 내용은 문안 저장 후 복사에 반영됩니다.</p>
-
-            <div class="template-actions">
-              <button data-save-template="preferredSubject preferredBody rejectedSubject rejectedBody">문안 저장</button>
-              <button data-copy="preferredSubject">우선대상자 제목 복사</button>
-              <button data-copy="preferredBody">우선대상자 본문 복사</button>
-              <button data-copy="rejectedSubject">탈락자 제목 복사</button>
-              <button data-copy="rejectedBody">탈락자 본문 복사</button>
-              <button id="completeNotice">통보 완료</button>
-            </div>
-          </div>
-        </section>
-      </section>
-    </section>
+    <section id="operatorView" class="hidden"></section>
   </main>
 
   <script>
@@ -651,12 +541,17 @@
     const sessionBar = document.querySelector('#sessionBar');
     const sessionTitle = document.querySelector('#sessionTitle');
     const sessionSubtitle = document.querySelector('#sessionSubtitle');
+    const roleSelection = document.querySelector('#roleSelection');
     const loginGrid = document.querySelector('#loginGrid');
+    const supplierLoginCard = document.querySelector('#supplierLoginCard');
     const operatorLoginCard = document.querySelector('#operatorLoginCard');
+    const operatorEntryButton = document.querySelector('#operatorEntryButton');
     const supplierLoginPanel = document.querySelector('#supplierLoginPanel');
     const supplierSignupPanel = document.querySelector('#supplierSignupPanel');
     const savedTemplateText = new Map();
+    const savedEvaluationIds = new Set();
     let prototypeSupplierAccount = null;
+    let operatorNoticeMode = 'active';
 
     function readInput(name) {
       return document.querySelector(`[name="${name}"]`)?.value.trim() || '';
@@ -675,10 +570,30 @@
       return prototypeFile || operatorQuery || operatorPath;
     }
 
+    function showAuthPage(page) {
+      const entry = page === 'entry';
+      const supplier = page === 'supplier';
+      const operator = page === 'operator';
+      if (operator && !canShowOperatorLogin()) return;
+      roleSelection.classList.toggle('hidden', !entry);
+      loginGrid.classList.toggle('hidden', entry);
+      supplierLoginCard.classList.toggle('hidden', !supplier);
+      operatorLoginCard.classList.toggle('hidden', !operator);
+      loginGrid.classList.add('single');
+      message.textContent = entry
+        ? '입찰자 또는 운영자 로그인을 선택하세요.'
+        : supplier
+          ? '이메일과 비밀번호로 로그인하세요.'
+          : '운영자 이메일과 비밀번호로 로그인하세요.';
+    }
+
     function applyOperatorAccessGate() {
       const allowed = canShowOperatorLogin();
-      operatorLoginCard.classList.toggle('hidden', !canShowOperatorLogin());
-      loginGrid.classList.toggle('single', !allowed);
+      operatorEntryButton.classList.toggle('hidden', !allowed);
+      roleSelection.classList.toggle('single', !allowed);
+      if (!allowed && !operatorLoginCard.classList.contains('hidden')) {
+        showAuthPage('entry');
+      }
     }
 
     function showSupplierAuthTab(mode) {
@@ -746,16 +661,154 @@
       loginAs('operator');
     }
 
+    function renderOperatorPrototypeView() {
+      const ended = operatorNoticeMode === 'ended';
+      return `
+        <section class="metric-row">
+          <article><strong>2</strong><span>등록 공고</span></article>
+          <article><strong>1</strong><span>평가 가능 공고</span></article>
+          <article><strong id="noticeStatusMetric">${ended ? '평가중' : '입찰중'}</strong><span>현재 공고 상태</span></article>
+        </section>
+
+        <section class="split-layout">
+          <aside class="panel">
+            <h2>입찰목록</h2>
+            <div class="notice-list">
+              <button class="notice-choice ${ended ? '' : 'active'}" type="button" data-operator-notice="active"><strong>사무실 네트워크 고도화</strong><span>정보기술 · 입찰중</span></button>
+              <button class="notice-choice ${ended ? 'active' : ''}" type="button" data-operator-notice="ended"><strong>완료된 보안 점검 용역</strong><span>시설관리 · 평가중</span></button>
+            </div>
+          </aside>
+
+          <section class="panel">
+            <h2>입찰목록 업로드</h2>
+            <label>공고명<input id="operatorNoticeTitle" value="신규 입찰 공고" required></label>
+            <label>분야<input id="operatorNoticeCategory" value="일반" required></label>
+            <label>설명<input id="operatorNoticeSummary" value="제안서 파일 제출이 필요한 공고입니다." required></label>
+            <label>시작일 (한국시간)<input id="operatorStartsAt" type="datetime-local" required></label>
+            <label>종료일 (한국시간)<input id="operatorDeadlineAt" type="datetime-local" required></label>
+            <label>제안요청서 파일<input id="operatorRequestFile" type="file" required></label>
+            <button id="addNotice" type="button">입찰목록 업로드</button>
+            <div class="upload-box">
+              <h3>제안요청서 교체</h3>
+              <label>교체 파일<input type="file" id="replacementRfpFile"></label>
+              <button id="replaceRfpFile" type="button">제안요청서 교체</button>
+              <p class="muted">입찰 참여자는 최신 제안요청서만 다운로드합니다. 교체된 원본 파일은 보관 이력으로 남습니다.</p>
+            </div>
+
+            <div class="mail-template">
+              <h2>Outlook 메일 템플릿</h2>
+              <h3>입찰 안내 메일</h3>
+              <label>메일 제목<input id="inviteSubject" value="[입찰 안내] 사무실 네트워크 고도화"></label>
+              <label>메일 본문<textarea id="inviteBody">안녕하세요.
+
+아래 공고는 현재 입찰중입니다.
+
+공고명: 사무실 네트워크 고도화
+공고 기간: 2026. 6. 22. 09:00 ~ 2026. 7. 5. 18:00 (한국시간)
+제안요청서: 사무실_네트워크_제안요청서.pdf
+
+입찰 사이트에 방문하여 공고 내용을 확인하고 제안요청서를 다운로드한 뒤, 마감 전까지 제안서를 업로드해 주세요.
+
+본 메일은 Outlook에서 발송됩니다.</textarea></label>
+              <p class="muted">수정한 내용은 문안 저장 후 복사에 반영됩니다.</p>
+              <div class="template-actions">
+                <button data-save-template="inviteSubject inviteBody" type="button">문안 저장</button>
+                <button data-copy="inviteSubject" type="button">제목 복사</button>
+                <button data-copy="inviteBody" type="button">본문 복사</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2>제안서 확인 및 검토</h2>
+            <div class="request-file">
+              <div>
+                <strong>제안요청서</strong>
+                <span class="muted">${ended ? '보안점검_제안요청서.pdf · 260 KB' : '사무실_네트워크_제안요청서.pdf · 340 KB'}</span>
+              </div>
+              <a class="download-link" download="제안요청서.txt" href="data:text/plain;charset=utf-8,%EC%A0%9C%EC%95%88%EC%9A%94%EC%B2%AD%EC%84%9C">제안요청서 다운로드</a>
+            </div>
+            ${ended ? `
+              <div class="submission-row">
+                <div>
+                  <strong>네트워크_제안서.pdf</strong>
+                  <span class="muted">서울공급웍스 · 512 KB</span>
+                  <a class="download-link" download="네트워크_제안서.pdf" href="data:text/plain;charset=utf-8,%EB%84%A4%ED%8A%B8%EC%9B%8C%ED%81%AC_%EC%A0%9C%EC%95%88%EC%84%9C.pdf">제안서 다운로드</a>
+                </div>
+                <label>평가 점수<input id="scoreA" data-evaluation-field data-evaluation-score-field data-evaluation-id="supplier-a" type="number" min="0" max="100" value=""></label>
+                <label>평가 메모<input data-evaluation-field value=""></label>
+                <div class="row-actions">
+                  <button data-evaluation-action data-evaluation-id="supplier-a" type="button">평가 저장</button>
+                  <button id="selectPreferred" data-result-action disabled type="button">우선대상자 선택</button>
+                </div>
+              </div>
+
+              <div class="submission-row">
+                <div>
+                  <strong>부산파트너스_제안서.pdf</strong>
+                  <span class="muted">부산제안파트너스 · 418 KB</span>
+                  <a class="download-link" download="부산파트너스_제안서.pdf" href="data:text/plain;charset=utf-8,%EB%B6%80%EC%82%B0%ED%8C%8C%ED%8A%B8%EB%84%88%EC%8A%A4_%EC%A0%9C%EC%95%88%EC%84%9C.pdf">제안서 다운로드</a>
+                </div>
+                <label>평가 점수<input data-evaluation-field data-evaluation-score-field data-evaluation-id="supplier-b" type="number" min="0" max="100" value=""></label>
+                <label>평가 메모<input data-evaluation-field value=""></label>
+                <div class="row-actions">
+                  <button data-evaluation-action data-evaluation-id="supplier-b" type="button">평가 저장</button>
+                  <button data-result-action disabled type="button">우선대상자 선택</button>
+                </div>
+              </div>
+              <p id="evaluationRequiredNotice" class="muted">모든 제출 업체의 평가를 저장한 뒤 우선대상자를 선택할 수 있습니다.</p>
+              <p id="lockedEvaluationNotice" class="muted hidden">결과 통보 완료 후에는 평가를 수정할 수 없습니다.</p>
+
+              <div class="mail-template hidden" id="resultMail">
+                <h2>결과 통보 메일 문안</h2>
+                <h3>우선대상자 메일 문안 - 서울공급웍스</h3>
+                <label>메일 제목<input id="preferredSubject" value="[입찰 결과 안내] 완료된 보안 점검 용역 우선대상자 선정"></label>
+                <label>메일 본문<textarea id="preferredBody">서울공급웍스 담당자님,
+
+완료된 보안 점검 용역 공고 검토 결과 귀사가 우선대상자로 선정되었습니다.
+후속 협의 일정과 필요 서류는 별도 안내드리겠습니다.</textarea></label>
+
+                <h3>탈락자 메일 문안 - 부산제안파트너스</h3>
+                <label>메일 제목<input id="rejectedSubject" value="[입찰 결과 안내] 완료된 보안 점검 용역"></label>
+                <label>메일 본문<textarea id="rejectedBody">부산제안파트너스 담당자님,
+
+완료된 보안 점검 용역 공고 검토 결과 아쉽게도 이번 입찰에서는 선정되지 않았습니다.
+소중한 제안서를 제출해 주셔서 감사드립니다.</textarea></label>
+                <p class="muted">수정한 내용은 문안 저장 후 복사에 반영됩니다.</p>
+
+                <div class="template-actions">
+                  <button data-save-template="preferredSubject preferredBody rejectedSubject rejectedBody" type="button">문안 저장</button>
+                  <button data-copy="preferredSubject" type="button">우선대상자 제목 복사</button>
+                  <button data-copy="preferredBody" type="button">우선대상자 본문 복사</button>
+                  <button data-copy="rejectedSubject" type="button">탈락자 제목 복사</button>
+                  <button data-copy="rejectedBody" type="button">탈락자 본문 복사</button>
+                  <button id="completeNotice" type="button">통보 완료</button>
+                </div>
+              </div>
+            ` : `
+              <p><span class="status-pill warning">공고 기간 종료 후 열람 가능</span></p>
+              <div class="submission-row">
+                <div>
+                  <strong>제출 파일 잠김</strong>
+                  <span class="muted">공고 기간 종료 후 열람 가능합니다.</span>
+                </div>
+                <span class="status-pill">기간 종료 후 열람 가능</span>
+              </div>
+            `}
+          </section>
+        </section>
+      `;
+    }
+
     function showLogin() {
       loginView.classList.remove('hidden');
       supplierView.classList.add('hidden');
       operatorView.classList.add('hidden');
+      operatorView.innerHTML = '';
       sessionBar.classList.add('hidden');
       message.classList.remove('hidden');
-      message.textContent = canShowOperatorLogin()
-        ? '운영자 이메일과 비밀번호로 로그인하세요.'
-        : '입찰 참여자는 로그인하거나 가입하세요.';
       applyOperatorAccessGate();
+      showAuthPage('entry');
     }
 
     function loginAs(role) {
@@ -764,13 +817,19 @@
       loginView.classList.add('hidden');
       supplierView.classList.toggle('hidden', operator);
       operatorView.classList.toggle('hidden', !operator);
-      sessionBar.classList.remove('hidden');
-      sessionTitle.textContent = operator ? '운영자' : '입찰 참여자';
-      sessionSubtitle.textContent = operator ? '플랫폼' : '서울공급웍스';
-      message.classList.toggle('hidden', operator);
-      if (!operator) {
-        message.textContent = '입찰 공고를 선택하고 제안요청서를 내려받은 뒤 제안서를 제출하세요.';
+      if (operator) {
+        operatorView.innerHTML = renderOperatorPrototypeView();
+        wireOperatorPrototype();
+      } else {
+        operatorView.innerHTML = '';
       }
+      sessionBar.classList.remove('hidden');
+      sessionTitle.textContent = operator ? '운영자' : '입찰자';
+      sessionSubtitle.textContent = operator ? '플랫폼' : '서울공급웍스';
+      message.classList.remove('hidden');
+      message.textContent = operator
+        ? '운영자 화면입니다. 공고 등록, 평가 저장, Outlook 통보 문안을 관리하세요.'
+        : '입찰 내용을 확인하고 제안요청서를 내려받은 뒤 제안서를 제출하세요.';
     }
 
     document.querySelectorAll('[data-login-role]').forEach((button) => {
@@ -785,14 +844,25 @@
     document.querySelectorAll('[data-auth-tab]').forEach((button) => {
       button.addEventListener('click', () => showSupplierAuthTab(button.dataset.authTab));
     });
+    document.querySelectorAll('[data-open-auth]').forEach((button) => {
+      button.addEventListener('click', () => {
+        showAuthPage(button.dataset.openAuth);
+        applyOperatorAccessGate();
+      });
+    });
     document.querySelector('[data-action="supplier-signup"]').addEventListener('click', handleSupplierSignup);
     applyOperatorAccessGate();
+    showAuthPage('entry');
 
     document.querySelector('[data-action="logout"]').addEventListener('click', showLogin);
 
     document.querySelector('#submitProposal').addEventListener('click', () => {
       const file = document.querySelector('#proposalFile').files[0];
-      document.querySelector('#submittedFileName').textContent = file ? file.name : '제안서.pdf';
+      if (!file) {
+        message.textContent = '제안서 파일을 선택하세요.';
+        return;
+      }
+      document.querySelector('#submittedFileName').textContent = file.name;
       document.querySelector('#supplierUpload').classList.add('hidden');
       document.querySelector('#supplierSubmitted').classList.remove('hidden');
       message.textContent = '제안서가 제출되었습니다. 운영자는 공고 기간 종료 후 파일을 열람할 수 있습니다.';
@@ -800,83 +870,160 @@
 
     document.querySelector('#replaceProposal').addEventListener('click', () => {
       const file = document.querySelector('#replacementProposalFile').files[0];
-      document.querySelector('#submittedFileName').textContent = file ? file.name : '교체된_제안서.zip';
-      message.textContent = '제안서 파일이 교체되었습니다. 운영자는 최종 제출본만 평가합니다.';
+      if (!file) {
+        message.textContent = '교체할 제안서 파일을 선택하세요.';
+        return;
+      }
+      document.querySelector('#submittedFileName').textContent = file.name;
+      message.textContent = '제안서 파일이 교체되었습니다. 운영자는 최종 제출본만 평가하고, 교체 전 원본도 보관 이력으로 남습니다.';
     });
 
-    document.querySelector('#addNotice').addEventListener('click', () => {
-      message.textContent = '공고가 추가되었고 상태는 입찰중입니다.';
-    });
-
-    document.querySelector('#replaceRfpFile').addEventListener('click', () => {
-      const file = document.querySelector('#replacementRfpFile').files[0];
-      message.classList.remove('hidden');
-      message.textContent = file
-        ? '제안요청서가 최신 파일로 교체되었습니다. 입찰 참여자는 최신 제안요청서만 다운로드합니다.'
-        : '교체할 제안요청서 파일을 선택하세요.';
+    document.querySelectorAll('[data-supplier-notice]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const ended = button.dataset.supplierNotice === 'ended';
+        document.querySelectorAll('[data-supplier-notice]').forEach((item) => {
+          item.classList.toggle('active', item === button);
+        });
+        document.querySelector('#supplierNoticeTitle').textContent = ended ? '완료된 보안 점검 용역' : '사무실 네트워크 고도화';
+        document.querySelector('#supplierNoticeSummary').textContent = ended
+          ? '보안 점검 수행 결과와 개선 항목을 검토하는 공고입니다.'
+          : '사무실 네트워크 장비와 무선 환경을 개선합니다.';
+        document.querySelector('#supplierNoticePeriod').textContent = ended
+          ? '2026. 6. 1. 09:00 ~ 2026. 6. 10. 18:00 (한국시간)'
+          : '2026. 6. 22. 09:00 ~ 2026. 7. 5. 18:00 (한국시간)';
+        const status = document.querySelector('#supplierNoticeStatus');
+        status.textContent = ended ? '평가중' : '입찰중';
+        status.classList.toggle('live', !ended);
+        document.querySelector('#supplierRfpName').textContent = ended
+          ? '보안점검_제안요청서.pdf · 260 KB'
+          : '사무실_네트워크_제안요청서.pdf · 340 KB';
+        document.querySelector('#supplierUpload').classList.toggle('hidden', ended);
+        document.querySelector('#supplierSubmitted').classList.add('hidden');
+        message.textContent = ended
+          ? '선택한 공고는 마감되어 제안서 제출을 할 수 없습니다.'
+          : '입찰 내용을 확인하고 제안요청서를 내려받은 뒤 제안서를 제출하세요.';
+      });
     });
 
     function refreshResultActions() {
-      const scoresComplete = Array.from(document.querySelectorAll('[data-evaluation-score-field]'))
-        .every((field) => field.value.trim() !== '');
-      document.querySelectorAll('[data-result-action]').forEach((control) => {
+      const scoresComplete = savedEvaluationIds.size >= 2;
+      operatorView.querySelectorAll('[data-result-action]').forEach((control) => {
         control.disabled = !scoresComplete;
       });
-      document.querySelector('#evaluationRequiredNotice').classList.toggle('hidden', scoresComplete);
+      operatorView.querySelector('#evaluationRequiredNotice')?.classList.toggle('hidden', scoresComplete);
     }
 
-    document.querySelectorAll('[data-evaluation-score-field]').forEach((field) => {
-      field.addEventListener('input', refreshResultActions);
-    });
-    refreshResultActions();
-
-    document.querySelector('#selectPreferred').addEventListener('click', () => {
-      document.querySelector('#resultMail').classList.remove('hidden');
-      document.querySelector('#noticeStatusMetric').textContent = '결과 통보 대기';
-      message.textContent = '우선대상자를 선택했습니다. 결과 통보 메일 문안을 Outlook에서 발송하세요.';
-    });
-
-    document.querySelector('#completeNotice').addEventListener('click', () => {
-      document.querySelector('#noticeStatusMetric').textContent = '통보 완료';
-      document.querySelector('#lockedEvaluationNotice').classList.remove('hidden');
-      document.querySelectorAll('[data-evaluation-action], [data-result-action], [data-evaluation-field]').forEach((control) => {
-        control.disabled = true;
-      });
-      message.textContent = 'Outlook 결과 통보 완료 상태가 기록되었습니다.';
-    });
-
-    document.querySelectorAll('[data-copy]').forEach((button) => {
-      const source = document.querySelector(`#${button.dataset.copy}`);
-      if (source && !savedTemplateText.has(button.dataset.copy)) {
-        savedTemplateText.set(button.dataset.copy, source.value);
-      }
-    });
-
-    document.querySelectorAll('[data-save-template]').forEach((button) => {
-      button.addEventListener('click', () => {
-        button.dataset.saveTemplate.split(' ').filter(Boolean).forEach((sourceId) => {
-          const source = document.querySelector(`#${sourceId}`);
-          savedTemplateText.set(sourceId, source?.value || '');
-        });
-        message.classList.remove('hidden');
-        message.textContent = 'Outlook 메일 문안이 저장되었습니다. 복사 버튼은 저장된 문안만 사용합니다.';
-      });
-    });
-
-    document.querySelectorAll('[data-copy]').forEach((button) => {
-      button.addEventListener('click', async () => {
-        const source = document.querySelector(`#${button.dataset.copy}`);
-        const text = savedTemplateText.get(button.dataset.copy) ?? source.value;
-        try {
-          await navigator.clipboard.writeText(text);
-          message.textContent = '저장된 Outlook 문안을 복사했습니다.';
-        } catch {
-          if (source.value !== text) source.value = text;
-          source.select();
-          message.textContent = '선택된 문안을 복사해서 Outlook에 붙여넣으세요.';
+    function wireTemplateButtons(scope) {
+      scope.querySelectorAll('[data-copy]').forEach((button) => {
+        const source = scope.querySelector(`#${button.dataset.copy}`);
+        if (source && !savedTemplateText.has(button.dataset.copy)) {
+          savedTemplateText.set(button.dataset.copy, source.value);
         }
       });
-    });
+
+      scope.querySelectorAll('[data-save-template]').forEach((button) => {
+        button.addEventListener('click', () => {
+          button.dataset.saveTemplate.split(' ').filter(Boolean).forEach((sourceId) => {
+            const source = scope.querySelector(`#${sourceId}`);
+            savedTemplateText.set(sourceId, source?.value || '');
+          });
+          message.classList.remove('hidden');
+          message.textContent = 'Outlook 메일 문안이 저장되었습니다. 복사 버튼은 저장된 문안만 사용합니다.';
+        });
+      });
+
+      scope.querySelectorAll('[data-copy]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const source = scope.querySelector(`#${button.dataset.copy}`);
+          const text = savedTemplateText.get(button.dataset.copy) ?? source?.value ?? '';
+          try {
+            await navigator.clipboard.writeText(text);
+            message.textContent = '저장된 Outlook 문안을 복사했습니다.';
+          } catch {
+            if (source && source.value !== text) source.value = text;
+            source?.select();
+            message.textContent = '선택된 문안을 복사해서 Outlook에 붙여넣으세요.';
+          }
+        });
+      });
+    }
+
+    function wireOperatorPrototype() {
+      operatorView.querySelectorAll('[data-operator-notice]').forEach((button) => {
+        button.addEventListener('click', () => {
+          operatorNoticeMode = button.dataset.operatorNotice;
+          operatorView.innerHTML = renderOperatorPrototypeView();
+          wireOperatorPrototype();
+        });
+      });
+
+      operatorView.querySelector('#addNotice')?.addEventListener('click', () => {
+        message.classList.remove('hidden');
+        const title = operatorView.querySelector('#operatorNoticeTitle')?.value.trim();
+        const category = operatorView.querySelector('#operatorNoticeCategory')?.value.trim();
+        const summary = operatorView.querySelector('#operatorNoticeSummary')?.value.trim();
+        if (!title || !category || !summary) {
+          message.textContent = '공고명, 분야, 설명을 모두 입력하세요.';
+          return;
+        }
+        if (!operatorView.querySelector('#operatorStartsAt')?.value || !operatorView.querySelector('#operatorDeadlineAt')?.value) {
+          message.textContent = '공고 시작일과 종료일을 입력하세요.';
+          return;
+        }
+        if (!operatorView.querySelector('#operatorRequestFile')?.files[0]) {
+          message.textContent = '제안요청서 파일을 선택하세요.';
+          return;
+        }
+        message.textContent = '공고가 추가되었고 상태는 입찰중입니다.';
+      });
+
+      operatorView.querySelector('#replaceRfpFile')?.addEventListener('click', () => {
+        const file = operatorView.querySelector('#replacementRfpFile')?.files[0];
+        message.classList.remove('hidden');
+        message.textContent = file
+          ? '제안요청서가 최신 파일로 교체되었습니다. 입찰 참여자는 최신 제안요청서만 다운로드하고, 교체된 원본 파일은 보관 이력으로 남습니다.'
+          : '교체할 제안요청서 파일을 선택하세요.';
+      });
+
+      operatorView.querySelectorAll('[data-evaluation-action]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const evaluationId = button.dataset.evaluationId;
+          const scoreField = operatorView.querySelector(`[data-evaluation-score-field][data-evaluation-id="${evaluationId}"]`);
+          message.classList.remove('hidden');
+          if (!scoreField?.value.trim()) {
+            message.textContent = '평가 점수를 입력한 뒤 저장하세요.';
+            return;
+          }
+          savedEvaluationIds.add(evaluationId);
+          message.textContent = '평가가 저장되었습니다. 모든 제출 업체의 평가를 저장하면 우선대상자를 선택할 수 있습니다.';
+          refreshResultActions();
+        });
+      });
+      refreshResultActions();
+
+      operatorView.querySelectorAll('[data-result-action]').forEach((button) => {
+        button.addEventListener('click', () => {
+          operatorView.querySelector('#resultMail')?.classList.remove('hidden');
+          const metric = operatorView.querySelector('#noticeStatusMetric');
+          if (metric) metric.textContent = '결과 통보 대기';
+          message.classList.remove('hidden');
+          message.textContent = '우선대상자를 선택했습니다. 결과 통보 메일 문안을 Outlook에서 발송하세요.';
+        });
+      });
+
+      operatorView.querySelector('#completeNotice')?.addEventListener('click', () => {
+        const metric = operatorView.querySelector('#noticeStatusMetric');
+        if (metric) metric.textContent = '통보 완료';
+        operatorView.querySelector('#lockedEvaluationNotice')?.classList.remove('hidden');
+        operatorView.querySelectorAll('[data-evaluation-action], [data-result-action], [data-evaluation-field]').forEach((control) => {
+          control.disabled = true;
+        });
+        message.classList.remove('hidden');
+        message.textContent = 'Outlook 결과 통보 완료 상태가 기록되었습니다.';
+      });
+
+      wireTemplateButtons(operatorView);
+    }
   </script>
 </body>
 </html>

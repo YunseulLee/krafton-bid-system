@@ -1,5 +1,7 @@
 # Supabase and Vercel Deployment
 
+This page is a legacy reference for the earlier Supabase/Vercel path. The current implementation is moving to the AWS EKS API structure, so the browser app uses `VITE_BID_API_BASE_URL` and does not connect directly to Supabase from the browser.
+
 ## Supabase
 
 1. Create a Supabase project.
@@ -21,30 +23,30 @@ where email = 'operator@example.com';
 
 Do not put the operator password in source code, Vercel environment variables, or the static prototype. Supplier users should sign up from the app. Supplier login information expires after 14 days, and suppliers create a new account when the previous login information expires.
 
-During review testing, the public app address shows both the participant login and the operator login so the full workflow can be tested from Vercel. Before production use, set `VITE_OPERATOR_LOGIN_REVIEW_MODE=false` and `OPERATOR_LOGIN_REVIEW_MODE=false` in Vercel. Then the operator login is shown only on the operator address, such as `/operator`, and the Vercel middleware allows that address only from `103.114.126.33` and `103.114.126.34`. The real data access control is still the `operator` role in Supabase policies.
+During review testing, set `VITE_OPERATOR_LOGIN_REVIEW_MODE=true` and `OPERATOR_LOGIN_REVIEW_MODE=true` only while workflow testing is in progress. Before production use, set both values to `false`. Then the operator login is shown only on the operator address, such as `/operator`, and the Vercel middleware allows that address only from `103.114.126.33` and `103.114.126.34`. The real data access control is still the operator role in the backend and database policies.
 
 ## Local App
 
 1. Copy `.env.example` to `.env.local`.
-2. Set `VITE_SUPABASE_URL`.
-3. Set `VITE_SUPABASE_ANON_KEY`.
+2. Set `VITE_BID_API_BASE_URL`.
+3. Keep `VITE_OPERATOR_LOGIN_REVIEW_MODE=false` unless review testing needs the operator button on the public first screen.
 4. Run `npm install`.
-5. Run `npm run dev`.
+5. Run `npm start`.
 
 If the Codex sandbox blocks local ports, run the same commands from a normal terminal on the Mac. If port `4173` is already unavailable, run `PORT=4174 npm start` for the dependency-free preview server and open `http://127.0.0.1:4174/`.
 
 ## Vercel
 
 1. Import the repository into Vercel.
-2. Set Framework Preset to Vite.
+2. Set Framework Preset to Other.
 3. Set Build Command to `npm run build`.
 4. Set Output Directory to `dist`.
-5. Add environment variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-6. For review testing, keep `VITE_OPERATOR_LOGIN_REVIEW_MODE=true` and `OPERATOR_LOGIN_REVIEW_MODE=true`, or omit them because review mode is enabled by default.
+5. Add environment variable `VITE_BID_API_BASE_URL`.
+6. For review testing, set `VITE_OPERATOR_LOGIN_REVIEW_MODE=true` and `OPERATOR_LOGIN_REVIEW_MODE=true`.
 7. Before production use, set `VITE_OPERATOR_LOGIN_REVIEW_MODE=false` and `OPERATOR_LOGIN_REVIEW_MODE=false`. This hides the operator login from the public screen and limits `/operator` and `?operator=1` to `103.114.126.33` and `103.114.126.34`.
 8. Deploy.
 
-Do not add a Supabase service-role key to Vercel for this frontend-only app.
+Do not add a Supabase service-role key, database password, AWS secret, or private backend token to Vercel for this frontend app.
 
 ## Outlook Mail Flow
 

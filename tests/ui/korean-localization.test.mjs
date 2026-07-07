@@ -7,7 +7,7 @@ test('browser action labels and workflow messages are Korean', async () => {
   const appSource = await readFile('src/ui/app.js', 'utf8');
 
   assert.match(appSource, /이메일과 비밀번호로 로그인하세요/);
-  assert.match(appSource, /Supabase 환경변수/);
+  assert.match(appSource, /AWS EKS API 주소/);
   assert.match(appSource, /입찰 참여/);
   assert.match(appSource, /운영자/);
   assert.match(appSource, /제안서가 제출되었습니다/);

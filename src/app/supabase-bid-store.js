@@ -15,6 +15,15 @@ async function createSignedUrl(supabase, bucket, path) {
   return result.data?.signedUrl || '';
 }
 
+async function removeUploadedFile(supabase, bucket, path) {
+  if (!path) return;
+  try {
+    await supabase.storage.from(bucket).remove([path]);
+  } catch {
+    // Keep the original database error visible to the operator or participant.
+  }
+}
+
 function createRandomId() {
   const randomUUID = globalThis.crypto?.randomUUID;
   if (typeof randomUUID !== 'function') {
@@ -77,7 +86,6 @@ export function createSupabaseBidStore({ supabase, nowProvider = () => new Date(
         options: {
           data: {
             role: 'supplier',
-            login_expires_at: loginExpiresAt,
           },
         },
       });
@@ -143,24 +151,29 @@ export function createSupabaseBidStore({ supabase, nowProvider = () => new Date(
       const upload = await supabase.storage.from('rfp-files').upload(rfpPath, input.requestFile, { upsert: false });
       assertSupabaseResult(upload, '제안요청서 업로드에 실패했습니다.');
 
-      const insert = await supabase
-        .from('bid_notices')
-        .insert({
-          id: noticeId,
-          title: input.title,
-          category: input.category,
-          summary: input.summary,
-          starts_at: input.startsAt,
-          deadline_at: input.deadlineAt,
-          status: 'published',
-          rfp_file_path: rfpPath,
-          rfp_file_name: input.requestFile.name,
-          rfp_file_size: input.requestFile.size || 0,
-          created_by: member.id,
-        })
-        .select()
-        .single();
-      return mapNoticeRow(assertSupabaseResult(insert, '공고 등록에 실패했습니다.'));
+      try {
+        const insert = await supabase
+          .from('bid_notices')
+          .insert({
+            id: noticeId,
+            title: input.title,
+            category: input.category,
+            summary: input.summary,
+            starts_at: input.startsAt,
+            deadline_at: input.deadlineAt,
+            status: 'published',
+            rfp_file_path: rfpPath,
+            rfp_file_name: input.requestFile.name,
+            rfp_file_size: input.requestFile.size || 0,
+            created_by: member.id,
+          })
+          .select()
+          .single();
+        return mapNoticeRow(assertSupabaseResult(insert, '공고 등록에 실패했습니다.'));
+      } catch (error) {
+        await removeUploadedFile(supabase, 'rfp-files', rfpPath);
+        throw error;
+      }
     },
 
     async replaceNoticeRequestFile(member, noticeId, requestFile) {
@@ -168,57 +181,48 @@ export function createSupabaseBidStore({ supabase, nowProvider = () => new Date(
         throw new Error('운영자만 제안요청서를 교체할 수 있습니다.');
       }
       const now = nowProvider();
-      const timestamp = createTimestamp(now);
-      const currentNotice = assertSupabaseResult(
+      const current = assertSupabaseResult(
         await supabase
           .from('bid_notices')
-          .select('rfp_file_path')
+          .select('deadline_at,result_notified_at')
           .eq('id', noticeId)
           .single(),
-        '기존 제안요청서를 확인하지 못했습니다.'
+        '공고 정보를 확인하지 못했습니다.'
       );
+      if (new Date(current.deadline_at).getTime() <= now.getTime() || current.result_notified_at) {
+        throw new Error('공고 마감 전까지만 제안요청서를 교체할 수 있습니다.');
+      }
+      const timestamp = createTimestamp(now);
       const rfpPath = createRfpFilePath({ noticeId, fileName: requestFile.name, timestamp });
       const upload = await supabase.storage.from('rfp-files').upload(rfpPath, requestFile, { upsert: false });
       assertSupabaseResult(upload, '제안요청서 업로드에 실패했습니다.');
 
-      const update = await supabase
-        .from('bid_notices')
-        .update({
-          rfp_file_path: rfpPath,
-          rfp_file_name: requestFile.name,
-          rfp_file_size: requestFile.size || 0,
-          updated_at: now.toISOString(),
-        })
-        .eq('id', noticeId)
-        .select()
-        .single();
-      const notice = mapNoticeRow(assertSupabaseResult(update, '제안요청서 교체에 실패했습니다.'));
-      if (currentNotice?.rfp_file_path && currentNotice.rfp_file_path !== rfpPath) {
-        const remove = await supabase.storage.from('rfp-files').remove([currentNotice.rfp_file_path]);
-        assertSupabaseResult(remove, '이전 제안요청서 삭제에 실패했습니다.');
+      try {
+        const update = await supabase
+          .from('bid_notices')
+          .update({
+            rfp_file_path: rfpPath,
+            rfp_file_name: requestFile.name,
+            rfp_file_size: requestFile.size || 0,
+            updated_at: now.toISOString(),
+          })
+          .eq('id', noticeId)
+          .select()
+          .single();
+        const notice = mapNoticeRow(assertSupabaseResult(update, '제안요청서 교체에 실패했습니다.'));
+        return notice;
+      } catch (error) {
+        await removeUploadedFile(supabase, 'rfp-files', rfpPath);
+        throw error;
       }
-      return notice;
     },
 
     async cleanupExpiredProposalRevisionFiles({ retentionDays = 30 } = {}) {
       const revisions = assertSupabaseResult(
-        await supabase.rpc('list_expired_proposal_revision_files', { retention_days: retentionDays }),
-        '삭제 대상 제안서 이력을 확인하지 못했습니다.'
+        await supabase.rpc('list_retained_proposal_revision_files', { retention_days: retentionDays }),
+        '보관 대상 제안서 이력을 확인하지 못했습니다.'
       ) || [];
-      const paths = revisions.map((revision) => revision.file_path).filter(Boolean);
-      const ids = revisions.map((revision) => revision.id).filter(Boolean);
-      if (paths.length === 0) return { deletedCount: 0 };
-
-      const remove = await supabase.storage.from('proposal-files').remove(paths);
-      assertSupabaseResult(remove, '이전 제안서 파일 삭제에 실패했습니다.');
-      assertSupabaseResult(
-        await supabase
-          .from('proposal_file_revisions')
-          .update({ storage_deleted_at: nowProvider().toISOString() })
-          .in('id', ids),
-        '삭제된 제안서 이력 표시를 저장하지 못했습니다.'
-      );
-      return { deletedCount: paths.length };
+      return { retainedCount: revisions.filter((revision) => revision.file_path).length };
     },
 
     async submitProposalFile(member, noticeId, file) {
@@ -244,24 +248,29 @@ export function createSupabaseBidStore({ supabase, nowProvider = () => new Date(
         status: 'submitted',
         updated_at: now.toISOString(),
       };
-      const save = existingProposal?.id
-        ? await supabase
-          .from('proposals')
-          .update(payload)
-          .eq('id', existingProposal.id)
-          .select()
-          .single()
-        : await supabase
-          .from('proposals')
-          .insert({
-            notice_id: noticeId,
-            supplier_id: member.id,
-            supplier_company_name: member.companyName,
-            ...payload,
-          })
-          .select()
-          .single();
-      return mapProposalRow(assertSupabaseResult(save, '제안서 제출에 실패했습니다.'), { participantSafe: true });
+      try {
+        const save = existingProposal?.id
+          ? await supabase
+            .from('proposals')
+            .update(payload)
+            .eq('id', existingProposal.id)
+            .select()
+            .single()
+          : await supabase
+            .from('proposals')
+            .insert({
+              notice_id: noticeId,
+              supplier_id: member.id,
+              supplier_company_name: member.companyName,
+              ...payload,
+            })
+            .select()
+            .single();
+        return mapProposalRow(assertSupabaseResult(save, '제안서 제출에 실패했습니다.'), { participantSafe: true });
+      } catch (error) {
+        await removeUploadedFile(supabase, 'proposal-files', filePath);
+        throw error;
+      }
     },
 
     async evaluateSubmission(member, proposalId, input) {

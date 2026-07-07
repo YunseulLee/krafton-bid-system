@@ -79,7 +79,7 @@ test('signUpSupplier creates a supplier login with a 14 day expiry', async () =>
   assert.equal(calls[0].email, 'supplier@example.com');
   assert.equal(calls[0].password, 'secret-password');
   assert.equal(calls[0].options.data.role, 'supplier');
-  assert.equal(calls[0].options.data.login_expires_at, '2026-07-09T00:00:00.000Z');
+  assert.equal(calls[0].options.data.login_expires_at, undefined);
   assert.equal(result.loginExpiresAt, '2026-07-09T00:00:00.000Z');
 });
 
@@ -231,7 +231,7 @@ test('submitProposalFile replaces an existing supplier proposal file instead of 
   assert.equal(calls.some((call) => call.table === 'proposals' && call.payload?.notice_id), false);
 });
 
-test('replaceNoticeRequestFile updates the notice to the latest request file', async () => {
+test('replaceNoticeRequestFile updates the notice and keeps the previous request file stored', async () => {
   const calls = [];
   const oldRfpPath = 'notices/notice-1/20260624093000-기존_제안요청서.pdf';
   const store = createSupabaseBidStore({
@@ -270,7 +270,11 @@ test('replaceNoticeRequestFile updates the notice to the latest request file', a
             const updateCall = calls.find((call) => call.table === 'bid_notices' && call.action === 'update');
             if (!updateCall) {
               return {
-                data: { rfp_file_path: oldRfpPath },
+                data: {
+                  rfp_file_path: oldRfpPath,
+                  deadline_at: '2026-06-30T09:00:00.000Z',
+                  result_notified_at: null,
+                },
                 error: null,
               };
             }
@@ -306,7 +310,7 @@ test('replaceNoticeRequestFile updates the notice to the latest request file', a
   const updateCall = calls.find((call) => call.table === 'bid_notices' && call.action === 'update');
   assert.equal(uploadCall.path, 'notices/notice-1/20260626010203-수정_제안요청서.pdf');
   assert.deepEqual(uploadCall.options, { upsert: false });
-  assert.deepEqual(removeCall.paths, [oldRfpPath]);
+  assert.equal(removeCall, undefined);
   assert.equal(updateCall.payload.rfp_file_path, uploadCall.path);
   assert.equal(updateCall.payload.rfp_file_name, '수정_제안요청서.pdf');
   assert.equal(updateCall.payload.rfp_file_size, 2048);
@@ -314,7 +318,172 @@ test('replaceNoticeRequestFile updates the notice to the latest request file', a
   assert.equal(notice.requestFile.name, '수정_제안요청서.pdf');
 });
 
-test('cleanupExpiredProposalRevisionFiles removes old stored proposal revisions and keeps metadata marked', async () => {
+test('replaceNoticeRequestFile rejects after the deadline before uploading', async () => {
+  const calls = [];
+  const store = createSupabaseBidStore({
+    nowProvider: () => new Date('2026-07-01T09:00:00.000Z'),
+    supabase: {
+      storage: {
+        from(bucket) {
+          return {
+            upload: async (path) => {
+              calls.push({ bucket, action: 'upload', path });
+              return { data: { path }, error: null };
+            },
+          };
+        },
+      },
+      from(table) {
+        assert.equal(table, 'bid_notices');
+        return {
+          select() { return this; },
+          eq() { return this; },
+          single: async () => ({
+            data: {
+              id: 'notice-1',
+              deadline_at: '2026-07-01T09:00:00.000Z',
+              result_notified_at: null,
+            },
+            error: null,
+          }),
+        };
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => store.replaceNoticeRequestFile(
+      { id: 'operator-1', role: 'Operator' },
+      'notice-1',
+      { name: '마감후_제안요청서.pdf', size: 2048 }
+    ),
+    /공고 마감 전까지만 제안요청서를 교체할 수 있습니다\./
+  );
+  assert.equal(calls.length, 0);
+});
+
+test('replaceNoticeRequestFile removes the newly uploaded file when database update fails', async () => {
+  const calls = [];
+  const store = createSupabaseBidStore({
+    nowProvider: () => new Date('2026-06-26T01:02:03.000Z'),
+    supabase: {
+      storage: {
+        from(bucket) {
+          return {
+            upload: async (path, file) => {
+              calls.push({ bucket, action: 'upload', path, fileName: file.name });
+              return { data: { path }, error: null };
+            },
+            remove: async (paths) => {
+              calls.push({ bucket, action: 'remove', paths });
+              return { data: paths.map((path) => ({ name: path })), error: null };
+            },
+          };
+        },
+      },
+      from(table) {
+        assert.equal(table, 'bid_notices');
+        const query = {
+          operation: '',
+          select() { return query; },
+          update(payload) {
+            calls.push({ table, action: 'update', payload });
+            query.operation = 'update';
+            return query;
+          },
+          eq() { return query; },
+          single: async () => {
+            if (query.operation === 'update') {
+              return { data: null, error: { message: 'database rejected update' } };
+            }
+            return {
+              data: {
+                id: 'notice-1',
+                deadline_at: '2026-06-30T09:00:00.000Z',
+                result_notified_at: null,
+              },
+              error: null,
+            };
+          },
+        };
+        return query;
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => store.replaceNoticeRequestFile(
+      { id: 'operator-1', role: 'Operator' },
+      'notice-1',
+      { name: '수정_제안요청서.pdf', size: 2048 }
+    ),
+    /database rejected update/
+  );
+
+  const uploadedPath = 'notices/notice-1/20260626010203-수정_제안요청서.pdf';
+  assert.deepEqual(
+    calls.find((call) => call.action === 'remove'),
+    { bucket: 'rfp-files', action: 'remove', paths: [uploadedPath] }
+  );
+});
+
+test('submitProposalFile removes the uploaded file when proposal save fails', async () => {
+  const calls = [];
+  const store = createSupabaseBidStore({
+    nowProvider: () => new Date('2026-06-24T09:30:00.000Z'),
+    supabase: {
+      storage: {
+        from(bucket) {
+          return {
+            upload: async (path, file) => {
+              calls.push({ bucket, action: 'upload', path, fileName: file.name });
+              return { data: { path }, error: null };
+            },
+            remove: async (paths) => {
+              calls.push({ bucket, action: 'remove', paths });
+              return { data: paths.map((path) => ({ name: path })), error: null };
+            },
+          };
+        },
+      },
+      from(table) {
+        if (table === 'participant_proposals') {
+          return {
+            select() { return this; },
+            eq() { return this; },
+            maybeSingle: async () => ({ data: null, error: null }),
+          };
+        }
+        assert.equal(table, 'proposals');
+        return {
+          insert() {
+            return {
+              select() { return this; },
+              single: async () => ({ data: null, error: { message: 'database rejected proposal' } }),
+            };
+          },
+        };
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => store.submitProposalFile(
+      { id: 'supplier-1', companyName: '서울공급웍스' },
+      'notice-1',
+      { name: '제안서.zip', size: 1000 }
+    ),
+    /database rejected proposal/
+  );
+
+  const uploadedPath = 'notices/notice-1/suppliers/supplier-1/20260624093000-제안서.zip';
+  assert.deepEqual(
+    calls.find((call) => call.action === 'remove'),
+    { bucket: 'proposal-files', action: 'remove', paths: [uploadedPath] }
+  );
+});
+
+test('cleanupExpiredProposalRevisionFiles keeps proposal revision files stored for long-term retention', async () => {
   const calls = [];
   const store = createSupabaseBidStore({
     nowProvider: () => new Date('2026-08-10T00:00:00.000Z'),
@@ -359,17 +528,11 @@ test('cleanupExpiredProposalRevisionFiles removes old stored proposal revisions 
 
   assert.deepEqual(
     calls.find((call) => call.action === 'rpc'),
-    { action: 'rpc', name: 'list_expired_proposal_revision_files', payload: { retention_days: 30 } }
+    { action: 'rpc', name: 'list_retained_proposal_revision_files', payload: { retention_days: 30 } }
   );
-  assert.deepEqual(calls.find((call) => call.bucket === 'proposal-files').paths, [
-    'notices/notice-1/suppliers/supplier-1/20260624093000-잘못된_제안서.zip',
-    'notices/notice-1/suppliers/supplier-2/20260624103000-초안_제안서.zip',
-  ]);
-  assert.deepEqual(calls.find((call) => call.table === 'proposal_file_revisions' && call.action === 'update').payload, {
-    storage_deleted_at: '2026-08-10T00:00:00.000Z',
-  });
-  assert.deepEqual(calls.find((call) => call.table === 'proposal_file_revisions' && call.action === 'in').values, ['revision-1', 'revision-2']);
-  assert.deepEqual(result, { deletedCount: 2 });
+  assert.equal(calls.find((call) => call.bucket === 'proposal-files'), undefined);
+  assert.equal(calls.find((call) => call.table === 'proposal_file_revisions'), undefined);
+  assert.deepEqual(result, { retainedCount: 2 });
 });
 
 test('loadDashboard signs operator proposal files from stored proposal paths', async () => {

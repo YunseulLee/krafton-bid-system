@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mapEvaluationRow, mapNoticeRow, mapProfileRow, mapProposalRow } from '../../src/app/supabase-mappers.js';
+import { mapEvaluationRow, mapNoticeRow, mapProfileRow, mapProposalRow } from '../../src/app/db-row-mappers.js';
 
-test('mapProfileRow converts Supabase roles to render roles', () => {
+test('mapProfileRow converts database roles to render roles', () => {
   assert.deepEqual(mapProfileRow({
     id: 'user-1',
     email: 'supplier@example.com',

@@ -1,6 +1,6 @@
-import { createMissingSupabaseConfigMessage } from '../integrations/supabase/config.js';
-import { createSupabaseBrowserClient } from '../integrations/supabase/client.js';
-import { createSupabaseBidStore } from '../app/supabase-bid-store.js';
+import { createMissingBidApiConfigMessage } from '../integrations/api/config.js';
+import { createBidApiClient } from '../integrations/api/client.js';
+import { createApiBidStore } from '../app/api-bid-store.js';
 import { renderDashboard } from './render.js';
 
 export function toKoreanTimeIsoString(value) {
@@ -29,7 +29,7 @@ function escapeHtml(value) {
 
 function labelRole(role) {
   if (role === 'Operator') return '운영자';
-  if (role === 'Supplier') return '입찰 참여자';
+  if (role === 'Supplier') return '입찰자';
   if (role === 'Buyer') return '구매자';
   return '사용자';
 }
@@ -58,13 +58,22 @@ export function isOperatorLoginAddress(location = globalThis.location) {
 }
 
 export function isOperatorLoginReviewModeEnabled(value = import.meta.env?.VITE_OPERATOR_LOGIN_REVIEW_MODE) {
-  if (value === undefined || value === null || value === '') return true;
+  if (value === undefined || value === null || value === '') return false;
   return /^(1|true|yes|on)$/i.test(String(value).trim());
 }
 
+function getOperatorLoginReviewModeValue() {
+  return globalThis.__BID_ENV__?.VITE_OPERATOR_LOGIN_REVIEW_MODE
+    ?? import.meta.env?.VITE_OPERATOR_LOGIN_REVIEW_MODE;
+}
+
 export function isOperatorLoginVisible(location = globalThis.location, options = {}) {
-  const reviewMode = options.reviewMode ?? isOperatorLoginReviewModeEnabled();
+  const reviewMode = options.reviewMode ?? isOperatorLoginReviewModeEnabled(getOperatorLoginReviewModeValue());
   return reviewMode || isOperatorLoginAddress(location);
+}
+
+export function chooseInitialAuthView(location = globalThis.location) {
+  return isOperatorLoginAddress(location) ? 'operator' : 'entry';
 }
 
 export function chooseSelectedNoticeId(notices, selectedNoticeId) {
@@ -99,20 +108,23 @@ function metadataFromFile(file) {
 
 export async function bootBidPlatformApp(root) {
   const now = () => new Date().toISOString();
-  const { client, config } = await createSupabaseBrowserClient();
-  let store = client ? createSupabaseBidStore({ supabase: client }) : null;
+  const { client, config } = await createBidApiClient();
+  let store = client ? createApiBidStore({ api: client }) : null;
   let session = { status: 'signed_out' };
   let state = null;
   let selectedNoticeId = null;
   let selectedFile = null;
   let supplierAuthMode = 'login';
-  let message = config.configured ? loginPromptMessage() : createMissingSupabaseConfigMessage();
+  let authView = chooseInitialAuthView(globalThis.location);
+  let message = config.configured ? loginPromptMessage() : createMissingBidApiConfigMessage();
   const savedMailTemplates = new Map();
 
   function loginPromptMessage() {
+    if (authView === 'supplier') return '입찰자 이메일과 비밀번호로 로그인하거나 가입하세요.';
+    if (authView === 'operator') return '운영자 이메일과 비밀번호로 로그인하세요.';
     return isOperatorLoginVisible(globalThis.location)
-      ? '입찰 참여자 또는 운영자는 로그인하세요.'
-      : '입찰 참여자는 로그인하거나 가입하세요.';
+      ? '입찰자 또는 운영자 로그인을 선택하세요.'
+      : '입찰자 로그인을 선택하세요.';
   }
 
   function currentMember() {
@@ -143,7 +155,7 @@ export async function bootBidPlatformApp(root) {
 
   function renderMissingConfigHint() {
     if (store) return '';
-    return '<p class="login-help">Supabase 환경변수 설정 후 로그인할 수 있습니다.</p>';
+    return '<p class="login-help">AWS EKS API 주소 설정 후 로그인할 수 있습니다.</p>';
   }
 
   function renderAuthTabs() {
@@ -173,7 +185,6 @@ export async function bootBidPlatformApp(root) {
         <label>비밀번호<input name="signupPassword" type="password" autocomplete="new-password" required></label>
         <label>비밀번호 확인<input name="signupPasswordConfirm" type="password" autocomplete="new-password" required></label>
         <p class="login-help">가입한 로그인 정보는 14일 동안만 사용할 수 있습니다. 사용기간이 지나면 다시 가입해야 합니다.</p>
-        <p class="login-help">계정 사용기간이 만료되었습니다. 다시 가입해 주세요.</p>
         <button data-action="signup" type="submit" ${store ? '' : 'disabled'}>가입</button>
         ${renderMissingConfigHint()}
       </form>
@@ -191,8 +202,50 @@ export async function bootBidPlatformApp(root) {
     `;
   }
 
-  function renderLogin() {
+  function renderRoleSelection() {
     const showOperatorLogin = isOperatorLoginVisible(globalThis.location);
+    return `
+      <section class="login-grid ${showOperatorLogin ? '' : 'single'}" aria-label="접근 페이지 선택">
+        <button class="login-card auth-login" type="button" data-auth-view="supplier" aria-label="입찰자 로그인">
+          <strong>입찰자 로그인</strong>
+          <span>입찰 내용 확인 및 제안</span>
+        </button>
+        ${showOperatorLogin ? `
+        <button class="login-card auth-login" type="button" data-auth-view="operator" aria-label="운영자 로그인">
+          <strong>운영자 로그인</strong>
+          <span>입찰목록 업로드 · 제안서 확인 및 검토</span>
+        </button>
+        ` : ''}
+      </section>
+    `;
+  }
+
+  function renderSupplierAuthScreen() {
+    return `
+      <section class="login-grid single" aria-label="입찰자 로그인">
+        <section class="login-card auth-login" aria-label="입찰자 로그인">
+          <button class="back-button" type="button" data-auth-view="entry">이전</button>
+          <strong>입찰자 로그인</strong>
+          ${renderAuthTabs()}
+          ${supplierAuthMode === 'signup' ? renderSignupForm() : renderSupplierLoginForm()}
+        </section>
+      </section>
+    `;
+  }
+
+  function renderOperatorAuthScreen() {
+    return `
+      <section class="login-grid single" aria-label="운영자 로그인">
+        <section class="login-card auth-login" aria-label="운영자 로그인">
+          <button class="back-button" type="button" data-auth-view="entry">이전</button>
+          <strong>운영자 로그인</strong>
+          ${renderOperatorLoginForm()}
+        </section>
+      </section>
+    `;
+  }
+
+  function renderLogin() {
     return `
       <section class="login-screen">
         <header class="topbar">
@@ -200,19 +253,9 @@ export async function bootBidPlatformApp(root) {
             <h1>크래프톤 입찰시스템</h1>
           </div>
         </header>
-        <section class="login-grid ${showOperatorLogin ? '' : 'single'}" aria-label="로그인 선택">
-          <section class="login-card auth-login" aria-label="입찰 참여자 로그인">
-            <strong>입찰 참여자 로그인</strong>
-            ${renderAuthTabs()}
-            ${supplierAuthMode === 'signup' ? renderSignupForm() : renderSupplierLoginForm()}
-          </section>
-          ${showOperatorLogin ? `
-          <section class="login-card auth-login" aria-label="운영자 로그인">
-            <strong>운영자 로그인</strong>
-            ${renderOperatorLoginForm()}
-          </section>
-          ` : ''}
-        </section>
+        ${authView === 'supplier' ? renderSupplierAuthScreen() : ''}
+        ${authView === 'operator' ? renderOperatorAuthScreen() : ''}
+        ${authView === 'entry' ? renderRoleSelection() : ''}
       </section>
     `;
   }
@@ -242,12 +285,22 @@ export async function bootBidPlatformApp(root) {
     `;
     hydrateSavedMailTemplates();
 
+    root.querySelectorAll('[data-auth-view]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const nextView = button.dataset.authView;
+        if (nextView === 'operator' && !isOperatorLoginVisible(globalThis.location)) return;
+        authView = nextView;
+        message = loginPromptMessage();
+        render();
+      });
+    });
+
     root.querySelectorAll('[data-auth-mode]').forEach((button) => {
       button.addEventListener('click', () => {
         supplierAuthMode = button.dataset.authMode;
         message = supplierAuthMode === 'signup'
           ? '가입한 로그인 정보는 14일 동안만 사용할 수 있습니다.'
-          : '입찰 참여자 이메일과 비밀번호로 로그인하세요.';
+          : '입찰자 이메일과 비밀번호로 로그인하세요.';
         render();
       });
     });
@@ -257,7 +310,7 @@ export async function bootBidPlatformApp(root) {
       loginForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (!store) {
-          message = createMissingSupabaseConfigMessage();
+          message = createMissingBidApiConfigMessage();
           render();
           return;
         }
@@ -270,7 +323,7 @@ export async function bootBidPlatformApp(root) {
           render();
           await signInWithExpectedRole({ email, password, expectedRole: 'Supplier' });
           selectedFile = null;
-          message = '입찰 참여자 계정으로 로그인되었습니다.';
+          message = '입찰자 계정으로 로그인되었습니다.';
           await refreshSession();
         } catch (error) {
           message = reportUserError(error, '로그인하지 못했습니다. 이메일과 비밀번호를 확인하세요.');
@@ -284,7 +337,7 @@ export async function bootBidPlatformApp(root) {
       operatorLoginForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (!store) {
-          message = createMissingSupabaseConfigMessage();
+          message = createMissingBidApiConfigMessage();
           render();
           return;
         }
@@ -311,7 +364,7 @@ export async function bootBidPlatformApp(root) {
       signupForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (!store) {
-          message = createMissingSupabaseConfigMessage();
+          message = createMissingBidApiConfigMessage();
           render();
           return;
         }
@@ -349,6 +402,7 @@ export async function bootBidPlatformApp(root) {
           state = null;
           selectedNoticeId = null;
           selectedFile = null;
+          authView = chooseInitialAuthView(globalThis.location);
           message = `로그아웃되었습니다. ${loginPromptMessage()}`;
         } catch (error) {
           message = reportUserError(error, '로그아웃하지 못했습니다. 잠시 후 다시 시도하세요.');
@@ -386,7 +440,7 @@ export async function bootBidPlatformApp(root) {
           await store.submitProposalFile(member, selectedNoticeId, selectedFile);
           selectedFile = null;
           message = replacing
-            ? '제안서 파일이 교체되었습니다. 운영자는 최종 제출본만 평가합니다.'
+            ? '제안서 파일이 교체되었습니다. 운영자는 최종 제출본만 평가하고, 교체 전 원본도 보관 이력으로 남습니다.'
             : '제안서가 제출되었습니다. 운영자는 공고 기간 종료 후 파일을 열람할 수 있습니다.';
           await refreshSession();
         } catch (error) {
@@ -406,12 +460,23 @@ export async function bootBidPlatformApp(root) {
           if (!store || !member) throw new Error('로그인 후 공고를 추가하세요.');
           const requestFile = metadataFromFile(form.get('requestFile'));
           if (!requestFile) throw new Error('제안요청서 파일을 선택하세요.');
+          const title = String(form.get('title') || '').trim();
+          const category = String(form.get('category') || '').trim();
+          const summary = String(form.get('summary') || '').trim();
+          if (!title || !category || !summary) {
+            throw new Error('공고명, 분야, 설명을 모두 입력하세요.');
+          }
+          const startsAtInput = String(form.get('startsAt') || '').trim();
+          const deadlineAtInput = String(form.get('deadlineAt') || '').trim();
+          if (!startsAtInput || !deadlineAtInput) {
+            throw new Error('공고 시작일과 종료일을 입력하세요.');
+          }
           const notice = await store.createOperatorNotice(member, {
-            title: form.get('title'),
-            category: form.get('category'),
-            summary: form.get('summary'),
-            startsAt: toKoreanTimeIsoString(form.get('startsAt')),
-            deadlineAt: toKoreanTimeIsoString(form.get('deadlineAt')),
+            title,
+            category,
+            summary,
+            startsAt: toKoreanTimeIsoString(startsAtInput),
+            deadlineAt: toKoreanTimeIsoString(deadlineAtInput),
             requestFile,
           });
           selectedNoticeId = notice.id;
@@ -438,7 +503,7 @@ export async function bootBidPlatformApp(root) {
           if (!requestFile) throw new Error('교체할 제안요청서 파일을 선택하세요.');
           await store.replaceNoticeRequestFile(member, noticeId, requestFile);
           selectedNoticeId = noticeId;
-          message = '제안요청서가 최신 파일로 교체되었습니다. 입찰 참여자는 최신 제안요청서만 다운로드합니다.';
+          message = '제안요청서가 최신 파일로 교체되었습니다. 입찰 참여자는 최신 제안요청서만 다운로드하고, 교체된 원본 파일은 보관 이력으로 남습니다.';
           await refreshSession();
         } catch (error) {
           message = reportUserError(error, '제안요청서를 교체하지 못했습니다. 입력 내용과 파일을 확인하세요.');
@@ -556,6 +621,7 @@ export async function bootBidPlatformApp(root) {
         selectedNoticeId = chooseSelectedNoticeId(state.notices, selectedNoticeId);
       } else if (session.status === 'expired') {
         supplierAuthMode = 'signup';
+        authView = 'supplier';
         message = session.message || '계정 사용기간이 만료되었습니다. 다시 가입해 주세요.';
         state = null;
         selectedNoticeId = null;

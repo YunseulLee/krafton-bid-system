@@ -49,15 +49,16 @@ test('operator middleware allows only the approved IP addresses', async () => {
   assert.equal(isAllowedOperatorIp('8.8.8.8'), false);
 });
 
-test('operator middleware keeps the Vercel review login open while testing', async () => {
-  const { default: middleware } = await loadMiddleware();
+test('operator middleware keeps the Vercel review login open only when testing is enabled', async () => {
+  const { protectOperatorLoginRequest } = await loadMiddleware();
   const request = new Request('https://bid.example.com/operator', {
     headers: {
       'x-forwarded-for': '8.8.8.8',
     },
   });
 
-  assert.equal(middleware(request), undefined);
+  assert.equal(protectOperatorLoginRequest(request, { reviewMode: true }), undefined);
+  assert.equal(protectOperatorLoginRequest(request).status, 302);
 });
 
 test('operator middleware can enforce the IP allowlist when review testing is disabled', async () => {

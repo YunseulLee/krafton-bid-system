@@ -46,7 +46,7 @@ function evaluateAllSubmissions(store) {
   }, '2026-06-25T09:35:00.000Z');
 }
 
-test('participant dashboard starts with notice list and proposal file upload', () => {
+test('participant dashboard starts with bid details and proposal submission flow', () => {
   const store = createPlatformStore(createSeedData());
   const html = renderDashboard({
     state: store.snapshot(),
@@ -55,13 +55,14 @@ test('participant dashboard starts with notice list and proposal file upload', (
     now: '2026-06-22T09:00:00.000Z',
   });
 
-  assert.match(html, /입찰 참여/);
-  assert.match(html, /공고 목록/);
+  assert.match(html, /입찰 내용 확인 및 제안/);
+  assert.match(html, /입찰목록/);
   assert.match(html, /사무실 네트워크 고도화/);
   assert.match(html, /제안요청서/);
   assert.match(html, /사무실_네트워크_제안요청서\.pdf/);
   assert.match(html, /제안요청서 다운로드/);
-  assert.match(html, /제안서 파일 업로드/);
+  assert.match(html, /제안서 제출/);
+  assert.doesNotMatch(html, /제안서 파일 업로드/);
   assert.match(html, /압축 파일로 제안서 파일을 제안하세요/);
   assert.doesNotMatch(html, /PDF, 문서, 압축 파일 등 제안서 파일을 선택해 제출하세요/);
   assert.match(html, /제안서 제출/);
@@ -124,7 +125,28 @@ test('participant dashboard locks file replacement after the deadline', () => {
   assert.doesNotMatch(html, /data-action="replace-proposal-file"/);
 });
 
-test('operator dashboard renders notice creation and locks files before the period ends', () => {
+test('participant dashboard treats the exact deadline as closed', () => {
+  const store = createPlatformStore(createSeedData());
+  store.submitProposalFile('member-supplier-1', 'notice-seed-1', {
+    name: '마감전_제안서.zip',
+    size: 256000,
+    type: 'application/zip',
+  }, '2026-06-23T09:00:00.000Z');
+
+  const html = renderDashboard({
+    state: store.snapshot(),
+    memberId: 'member-supplier-1',
+    selectedNoticeId: 'notice-seed-1',
+    now: '2026-07-05T09:00:00.000Z',
+  });
+
+  assert.match(html, /평가중/);
+  assert.match(html, /제출 마감 이후에는 파일을 교체할 수 없습니다/);
+  assert.doesNotMatch(html, /data-action="replace-proposal-file"/);
+  assert.doesNotMatch(html, /마감 전까지 파일을 교체할 수 있습니다/);
+});
+
+test('operator dashboard renders bid list upload and proposal review flow', () => {
   const store = createPlatformStore(createSeedData());
   store.submitProposalFile('member-supplier-1', 'notice-seed-1', {
     name: '마감전_제안서.pdf',
@@ -140,12 +162,20 @@ test('operator dashboard renders notice creation and locks files before the peri
   });
 
   assert.doesNotMatch(html, /운영자 공고 관리/);
-  assert.match(html, /새 공고 추가/);
+  assert.match(html, /입찰목록 업로드/);
+  assert.match(html, /제안서 확인 및 검토/);
+  assert.ok(html.indexOf('입찰목록 업로드') < html.indexOf('제안요청서 교체'));
+  assert.ok(html.indexOf('제안요청서 교체') < html.indexOf('제안서 확인 및 검토'));
+  assert.doesNotMatch(html, /새 공고 추가/);
   assert.match(html, /시작일 \(한국시간\)/);
   assert.match(html, /종료일 \(한국시간\)/);
+  assert.match(html, /name="title"[^>]*required/);
+  assert.match(html, /name="category"[^>]*required/);
+  assert.match(html, /name="summary"[^>]*required/);
   assert.match(html, /제안요청서 파일/);
   assert.match(html, /제안요청서 교체/);
   assert.match(html, /입찰 참여자는 최신 제안요청서만 다운로드합니다/);
+  assert.match(html, /교체된 원본 파일은 보관 이력으로 남습니다/);
   assert.match(html, /data-action="replace-rfp-file"/);
   assert.match(html, /입찰중/);
   assert.match(html, /Outlook 메일 템플릿/);
@@ -159,6 +189,24 @@ test('operator dashboard renders notice creation and locks files before the peri
   assert.match(html, /본문 복사/);
   assert.match(html, /공고 기간 종료 후 열람 가능합니다/);
   assert.doesNotMatch(html, /평가 기준/);
+});
+
+test('operator notice upload form requires the operator to enter the Korean-time bid period', () => {
+  const store = createPlatformStore(createSeedData());
+  const html = renderDashboard({
+    state: store.snapshot(),
+    memberId: 'member-operator-1',
+    selectedNoticeId: 'notice-seed-1',
+    now: '2026-07-07T00:00:00.000Z',
+  });
+
+  assert.match(html, /name="startsAt" type="datetime-local" required/);
+  assert.match(html, /name="deadlineAt" type="datetime-local" required/);
+  assert.doesNotMatch(html, /name="startsAt" type="datetime-local" value=/);
+  assert.doesNotMatch(html, /name="deadlineAt" type="datetime-local" value=/);
+  assert.doesNotMatch(html, /defaultNoticePeriod/);
+  assert.doesNotMatch(html, /value="2026-06-22T09:00"/);
+  assert.doesNotMatch(html, /value="2026-07-05T18:00"/);
 });
 
 test('operator dashboard shows submitted files and evaluation controls after the period ends', () => {

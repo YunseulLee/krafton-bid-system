@@ -272,6 +272,11 @@ button:hover {
   gap: 12px;
 }
 
+.operator-layout {
+  grid-template-columns: minmax(200px, 0.7fr) minmax(260px, 1fr) minmax(360px, 1.3fr);
+  align-items: start;
+}
+
 .split-layout .panel {
   margin-top: 0;
 }
@@ -509,6 +514,7 @@ textarea {
   }
 
   .split-layout,
+  .operator-layout,
   .login-grid {
     grid-template-columns: 1fr;
   }

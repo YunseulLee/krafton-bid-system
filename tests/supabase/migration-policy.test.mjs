@@ -22,10 +22,11 @@ test('migration creates core bid tables and participant-safe projections', async
   assert.match(sql, /create table if not exists public\.profiles/i);
   assert.match(sql, /create table if not exists public\.bid_notices/i);
   assert.match(sql, /create table if not exists public\.proposals/i);
+  assert.match(sql, /create table if not exists public\.rfp_file_revisions/i);
   assert.match(sql, /create table if not exists public\.proposal_file_revisions/i);
   assert.match(sql, /supplier_id uuid/i);
   assert.match(sql, /supplier_company_name text/i);
-  assert.match(sql, /storage_deleted_at timestamptz/i);
+  assert.doesNotMatch(sql, /storage_deleted_at timestamptz/i);
   assert.match(sql, /create table if not exists public\.evaluations/i);
   assert.match(sql, /create or replace view public\.participant_bid_notices/i);
   assert.match(sql, /create or replace view public\.participant_proposals/i);
@@ -40,6 +41,7 @@ test('migration enables RLS and avoids browser service-role usage', async () => 
   assert.match(sql, /alter table public\.profiles enable row level security/i);
   assert.match(sql, /alter table public\.bid_notices enable row level security/i);
   assert.match(sql, /alter table public\.proposals enable row level security/i);
+  assert.match(sql, /alter table public\.rfp_file_revisions enable row level security/i);
   assert.match(sql, /alter table public\.proposal_file_revisions enable row level security/i);
   assert.match(sql, /alter table public\.evaluations enable row level security/i);
   assert.match(sql, /create or replace function public\.is_operator/i);
@@ -50,63 +52,84 @@ test('migration enables RLS and avoids browser service-role usage', async () => 
 test('migration prepares 14 day supplier login expiry for self signup', async () => {
   const sql = await readMigration();
   const supplierFunction = functionSql(sql, 'is_supplier');
+  const signupTrigger = functionSql(sql, 'handle_new_auth_user');
 
   assert.match(sql, /login_expires_at timestamptz/i);
+  assert.match(sql, /supplier_id uuid null references public\.profiles\(id\) on delete set null/i);
+  assert.match(sql, /proposal_file_revisions_supplier_id_fkey/i);
+  assert.match(sql, /foreign key \(supplier_id\)[\s\S]*references public\.profiles\(id\)[\s\S]*on delete set null/i);
+  assert.match(sql, /alter table public\.proposals[\s\S]*alter column supplier_id drop not null/i);
   assert.match(sql, /create or replace function public\.handle_new_auth_user/i);
   assert.match(sql, /after insert on auth\.users/i);
-  assert.match(sql, /new\.raw_user_meta_data/i);
+  assert.match(signupTrigger, /now\(\) \+ interval '14 days'/i);
+  assert.doesNotMatch(signupTrigger, /login_expires_at'\s*,\s*''\)::timestamptz/i);
   assert.match(sql, /'supplier'/i);
+  assert.match(sql, /deleted_at timestamptz null/i);
+  assert.match(sql, /mark_expired_supplier_profiles_deleted/i);
   assert.match(supplierFunction, /login_expires_at is null or login_expires_at > now\(\)/i);
+  assert.match(supplierFunction, /deleted_at is null/i);
 });
 
 test('migration creates private storage buckets and deadline-gated proposal reads', async () => {
   const sql = await readMigration();
+  const rfpReadPolicy = policySql(sql, 'authenticated users read current rfp files');
 
   assert.match(sql, /insert into storage\.buckets[\s\S]*rfp-files/i);
   assert.match(sql, /insert into storage\.buckets[\s\S]*proposal-files/i);
   assert.match(sql, /bucket_id = 'proposal-files'/i);
-  assert.match(sql, /deadline_at < now\(\)/i);
+  assert.match(sql, /deadline_at <= now\(\)/i);
   assert.match(sql, /storage\.foldername\(name\)\)\[4\] = auth\.uid\(\)::text/i);
+  assert.match(rfpReadPolicy, /rfp_file_path = name/i);
+  assert.match(rfpReadPolicy, /status = 'published'/i);
+  assert.doesNotMatch(sql, /create policy "authenticated users read rfp files"[\s\S]*using \(bucket_id = 'rfp-files'\)/i);
 });
 
 test('proposal storage policies safely bind path notice ids to open notices and proposal rows', async () => {
   const sql = await readMigration();
   const uploadPolicy = policySql(sql, 'suppliers upload proposal files to own folder');
   const readPolicy = policySql(sql, 'operators read proposal files after deadline');
-  const proposalDeletePolicy = policySql(sql, 'operators delete replaced proposal files after notification retention');
-  const rfpDeletePolicy = policySql(sql, 'operators delete rfp files');
+  const revisionReadPolicy = policySql(sql, 'operators read retained proposal revision files after deadline');
 
   assert.match(sql, /create or replace function public\.uuid_or_null/i);
-  assert.match(sql, /create or replace function public\.list_expired_proposal_revision_files/i);
+  assert.match(sql, /create or replace function public\.record_rfp_file_revision/i);
+  assert.match(sql, /create or replace function public\.record_proposal_file_revision/i);
+  assert.doesNotMatch(sql, /list_expired_proposal_revision_files/i);
   assert.match(sql, /public\.uuid_or_null\(\(storage\.foldername\(name\)\)\[2\]\)/i);
   assert.doesNotMatch(sql, /\(\(storage\.foldername\(name\)\)\[2\]\)::uuid/i);
   assert.match(uploadPolicy, /starts_at <= now\(\)/i);
-  assert.match(uploadPolicy, /deadline_at >= now\(\)/i);
+  assert.match(uploadPolicy, /deadline_at > now\(\)/i);
+  assert.doesNotMatch(uploadPolicy, /deadline_at >= now\(\)/i);
   assert.match(uploadPolicy, /result_notified_at is null/i);
   assert.match(uploadPolicy, /storage\.foldername\(name\)\)\[4\] = auth\.uid\(\)::text/i);
   assert.match(readPolicy, /file_path = name/i);
-  assert.match(readPolicy, /deadline_at < now\(\)/i);
-  assert.match(rfpDeletePolicy, /bucket_id = 'rfp-files'/i);
-  assert.match(rfpDeletePolicy, /public\.is_operator\(\)/i);
-  assert.match(proposalDeletePolicy, /bucket_id = 'proposal-files'/i);
-  assert.match(proposalDeletePolicy, /proposal_file_revisions/i);
-  assert.match(proposalDeletePolicy, /result_notified_at is not null/i);
-  assert.match(proposalDeletePolicy, /interval '30 days'/i);
+  assert.match(readPolicy, /deadline_at <= now\(\)/i);
+  assert.match(revisionReadPolicy, /revision\.file_path = name/i);
+  assert.match(revisionReadPolicy, /deadline_at <= now\(\)/i);
+  assert.doesNotMatch(sql, /for delete to authenticated/i);
+  assert.doesNotMatch(sql, /delete replaced proposal files/i);
+  assert.doesNotMatch(sql, /delete rfp files/i);
 });
 
 test('migration adds database workflow guards for evaluations and notice results', async () => {
   const sql = await readMigration();
   const noticeGuard = functionSql(sql, 'validate_notice_update');
+  const evaluationGuard = functionSql(sql, 'validate_evaluation_write');
 
   assert.match(sql, /create or replace function public\.validate_evaluation_write/i);
   assert.match(sql, /create trigger validate_evaluation_write/i);
+  assert.match(evaluationGuard, /new\.evaluator_id <> auth\.uid\(\)/i);
+  assert.match(evaluationGuard, /public\.is_operator\(\)/i);
   assert.match(sql, /create or replace function public\.validate_notice_update/i);
   assert.match(sql, /create trigger validate_notice_update/i);
   assert.match(sql, /before insert or update on public\.bid_notices/i);
   assert.match(noticeGuard, /tg_op = 'insert'/i);
+  assert.match(noticeGuard, /deadline_at cannot be shortened/i);
+  assert.match(noticeGuard, /starts_at cannot change/i);
+  assert.match(noticeGuard, /result_notified_at locks notice changes/i);
+  assert.match(noticeGuard, /old\.deadline_at <= now\(\)/i);
   assert.match(noticeGuard, /preferred_proposal_id/i);
   assert.match(noticeGuard, /result_notified_at/i);
-  assert.match(noticeGuard, /deadline_at < now\(\)/i);
+  assert.match(noticeGuard, /deadline_at <= now\(\)/i);
   assert.match(noticeGuard, /result_notified_at is not null/i);
   assert.match(noticeGuard, /proposal\.notice_id/i);
   assert.match(noticeGuard, /not exists[\s\S]*evaluations/i);
@@ -135,12 +158,13 @@ test('migration prevents direct operator proposal update bypasses', async () => 
   assert.match(proposalGuard, /new\.supplier_id <> auth\.uid\(\)/i);
   assert.match(proposalGuard, /new\.status in \('selected', 'not_selected'\)/i);
   assert.match(proposalGuard, /result_notified_at is not null/i);
-  assert.match(proposalGuard, /deadline_at >= now\(\)/i);
+  assert.match(proposalGuard, /notice_deadline_at <= now\(\)/i);
   assert.match(proposalGuard, /not exists[\s\S]*evaluations/i);
   assert.match(proposalUpdatePolicy, /status in \('selected', 'not_selected'\)/i);
   assert.match(supplierReplacePolicy, /supplier_id = auth\.uid\(\)/i);
   assert.match(supplierReplacePolicy, /status = 'submitted'/i);
-  assert.match(supplierReplacePolicy, /deadline_at >= now\(\)/i);
+  assert.match(supplierReplacePolicy, /deadline_at > now\(\)/i);
+  assert.doesNotMatch(supplierReplacePolicy, /deadline_at >= now\(\)/i);
   assert.doesNotMatch(sql, /create policy "operators update proposal results"/i);
   assert.doesNotMatch(
     proposalUpdatePolicy,

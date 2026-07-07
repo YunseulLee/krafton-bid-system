@@ -14,11 +14,11 @@ function isNoticeOpen(notice, now) {
   const currentTime = new Date(now).getTime();
   const startsAt = notice.startsAt ? new Date(notice.startsAt).getTime() : Number.NEGATIVE_INFINITY;
   const deadlineAt = new Date(notice.deadlineAt).getTime();
-  return notice.status === NoticeStatus.Published && startsAt <= currentTime && currentTime <= deadlineAt;
+  return notice.status === NoticeStatus.Published && startsAt <= currentTime && currentTime < deadlineAt;
 }
 
 function hasNoticeEnded(notice, now) {
-  return new Date(now).getTime() > new Date(notice.deadlineAt).getTime();
+  return new Date(now).getTime() >= new Date(notice.deadlineAt).getTime();
 }
 
 function hasSelectedProposal(proposals, noticeId) {
@@ -119,6 +119,11 @@ export function createPlatformStore(seed) {
       const actor = member(memberId);
       assertRule(actor.role === MemberRole.Operator, 'ONLY_OPERATORS_CREATE_NOTICES', '운영자만 공고를 추가할 수 있습니다.');
       assertRule(
+        Boolean(String(input.title || '').trim() && String(input.category || '').trim() && String(input.summary || '').trim()),
+        'NOTICE_REQUIRED_FIELDS',
+        '공고명, 분야, 설명을 모두 입력하세요.'
+      );
+      assertRule(
         new Date(input.startsAt).getTime() < new Date(input.deadlineAt).getTime(),
         'INVALID_NOTICE_PERIOD',
         '공고 시작일은 종료일보다 앞서야 합니다.'
@@ -130,7 +135,7 @@ export function createPlatformStore(seed) {
         title: input.title,
         category: input.category,
         summary: input.summary,
-        requirements: input.requirements,
+        requirements: input.requirements || input.summary,
         startsAt: input.startsAt,
         deadlineAt: input.deadlineAt,
         requestFile: toFileMetadata(input.requestFile),

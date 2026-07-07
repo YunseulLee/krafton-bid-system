@@ -84,6 +84,6 @@ test('result templates split preferred and rejected suppliers without exposing e
   assert.match(templates.preferred[0].body, /서울공급웍스/);
   assert.match(templates.rejected[0].subject, /입찰 결과 안내/);
   assert.match(templates.rejected[0].body, /부산제안파트너스/);
-  assert.match(templates.rejected[0].body, /탈락/);
+  assert.match(templates.rejected[0].body, /선정되지 않았습니다/);
   assert.doesNotMatch(`${templates.preferred[0].body}\n${templates.rejected[0].body}`, /92|평가 점수|평가 메모/);
 });

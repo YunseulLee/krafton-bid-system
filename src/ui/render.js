@@ -3,7 +3,7 @@ import { createInvitationMailTemplate, createResultMailTemplates } from '../doma
 
 const roleLabels = {
   [MemberRole.Buyer]: '구매자',
-  [MemberRole.Supplier]: '공급사',
+  [MemberRole.Supplier]: '입찰자',
   [MemberRole.Operator]: '운영자',
 };
 
@@ -82,11 +82,11 @@ function isNoticeOpen(notice, now) {
   const currentTime = new Date(now).getTime();
   const startsAt = notice.startsAt ? new Date(notice.startsAt).getTime() : Number.NEGATIVE_INFINITY;
   const deadlineAt = new Date(notice.deadlineAt).getTime();
-  return notice.status === NoticeStatus.Published && startsAt <= currentTime && currentTime <= deadlineAt;
+  return notice.status === NoticeStatus.Published && startsAt <= currentTime && currentTime < deadlineAt;
 }
 
 function hasNoticeEnded(notice, now) {
-  return new Date(now).getTime() > new Date(notice.deadlineAt).getTime();
+  return new Date(now).getTime() >= new Date(notice.deadlineAt).getTime();
 }
 
 function findSelectedNotice(state, selectedNoticeId) {
@@ -144,7 +144,7 @@ function proposalFileHref(proposal) {
   return `data:text/plain;charset=utf-8,${encodeURIComponent(content)}`;
 }
 
-function renderRequestFile(notice, { canReplace = false } = {}) {
+function renderRequestFile(notice) {
   const file = notice.requestFile;
   if (!file?.name) {
     return '<p class="muted">등록된 제안요청서가 없습니다.</p>';
@@ -158,16 +158,21 @@ function renderRequestFile(notice, { canReplace = false } = {}) {
       </div>
       <a class="download-link" href="${escapeHtml(requestFileHref(notice))}" download="${escapeHtml(file.name)}">제안요청서 다운로드</a>
     </div>
-    ${canReplace ? `
-      <div class="upload-box">
-        <h3>제안요청서 교체</h3>
-        <label>교체 파일
-          <input type="file" data-rfp-file="${escapeHtml(notice.id)}">
-        </label>
-        <button data-action="replace-rfp-file" data-notice-id="${escapeHtml(notice.id)}">제안요청서 교체</button>
-        <p class="muted">입찰 참여자는 최신 제안요청서만 다운로드합니다.</p>
-      </div>
-    ` : ''}
+  `;
+}
+
+function renderRequestFileReplacement(notice, { canReplace = false } = {}) {
+  if (!notice?.requestFile?.name || !canReplace) return '';
+
+  return `
+    <div class="upload-box">
+      <h3>제안요청서 교체</h3>
+      <label>교체 파일
+        <input type="file" data-rfp-file="${escapeHtml(notice.id)}">
+      </label>
+      <button data-action="replace-rfp-file" data-notice-id="${escapeHtml(notice.id)}">제안요청서 교체</button>
+      <p class="muted">입찰 참여자는 최신 제안요청서만 다운로드합니다. 교체된 원본 파일은 보관 이력으로 남습니다.</p>
+    </div>
   `;
 }
 
@@ -266,14 +271,14 @@ function renderParticipant(state, member, selectedNoticeId, now, selectedProposa
   const canSubmit = canChangeProposalFile && !selectedProposal;
 
   return `
-    ${renderHeader('입찰 참여', member, state)}
+    ${renderHeader('입찰 내용 확인 및 제안', member, state)}
     <section class="metric-row">
-      <article><strong>${notices.length}</strong><span>공고 목록</span></article>
+      <article><strong>${notices.length}</strong><span>입찰목록</span></article>
       <article><strong>${myProposals.length}</strong><span>제출 제안서</span></article>
     </section>
     <section class="split-layout">
       <aside class="panel">
-        <h2>공고 목록</h2>
+        <h2>입찰목록</h2>
         <div class="notice-list">${renderNoticeList(state, notices, selectedNotice, now)}</div>
       </aside>
       <section class="panel">
@@ -285,7 +290,7 @@ function renderParticipant(state, member, selectedNoticeId, now, selectedProposa
           </dl>
           ${renderRequestFile(selectedNotice)}
           <div class="upload-box">
-            <h3>제안서 파일 업로드</h3>
+            <h3>제안서 제출</h3>
             ${selectedProposal ? `
               <p>이미 제출한 제안서: <strong>${escapeHtml(selectedProposal.file?.name || selectedProposal.id)}</strong></p>
               <span class="status-pill">제출 완료</span>
@@ -293,7 +298,7 @@ function renderParticipant(state, member, selectedNoticeId, now, selectedProposa
                 <input type="file" data-proposal-file>
                 ${renderSelectedProposalFile(selectedProposalFile)}
                 <button data-action="replace-proposal-file">파일 교체</button>
-                <p>마감 전까지 파일을 교체할 수 있습니다. 운영자는 최종 제출본만 평가합니다.</p>
+                <p>마감 전까지 파일을 교체할 수 있습니다. 운영자는 최종 제출본만 평가하고, 교체 전 원본도 보관 이력으로 남습니다.</p>
               ` : '<p>제출 마감 이후에는 파일을 교체할 수 없습니다.</p>'}
             ` : `
               <input type="file" data-proposal-file ${canSubmit ? '' : 'disabled'}>
@@ -367,32 +372,33 @@ function renderOperator(state, member, selectedNoticeId, now) {
       <article><strong>${state.notices.length}</strong><span>등록 공고</span></article>
       <article><strong>${endedCount}</strong><span>평가 가능 공고</span></article>
     </section>
-    <section class="split-layout">
+    <section class="split-layout operator-layout">
       <aside class="panel">
-        <h2>공고 목록</h2>
+        <h2>입찰목록</h2>
         <div class="notice-list">${renderNoticeList(state, state.notices, selectedNotice, now)}</div>
       </aside>
       <section class="panel">
-        <h2>새 공고 추가</h2>
+        <h2>입찰목록 업로드</h2>
         <form class="notice-form" data-form="notice-create">
-          <label>공고명<input name="title" value="신규 입찰 공고"></label>
-          <label>분야<input name="category" value="일반"></label>
-          <label>설명<input name="summary" value="제안서 파일 제출이 필요한 공고입니다."></label>
-          <label>시작일 (한국시간)<input name="startsAt" type="datetime-local" value="2026-06-22T09:00"></label>
-          <label>종료일 (한국시간)<input name="deadlineAt" type="datetime-local" value="2026-07-05T18:00"></label>
+          <label>공고명<input name="title" value="신규 입찰 공고" required></label>
+          <label>분야<input name="category" value="일반" required></label>
+          <label>설명<input name="summary" value="제안서 파일 제출이 필요한 공고입니다." required></label>
+          <label>시작일 (한국시간)<input name="startsAt" type="datetime-local" required></label>
+          <label>종료일 (한국시간)<input name="deadlineAt" type="datetime-local" required></label>
           <label>제안요청서 파일<input name="requestFile" type="file" required></label>
-          <button type="submit">공고 추가</button>
+          <button type="submit">입찰목록 업로드</button>
         </form>
+        ${selectedNotice ? renderRequestFileReplacement(selectedNotice, { canReplace: !hasNoticeEnded(selectedNotice, now) && !selectedNotice.resultNotifiedAt }) : ''}
       </section>
       <section class="panel">
-        <h2>${escapeHtml(selectedNotice?.title || '제출 파일 평가')}</h2>
+        <h2>제안서 확인 및 검토</h2>
         ${selectedNotice ? `
           <div class="status-line">
-            <p>${escapeHtml(formatDateTime(selectedNotice.startsAt))} ~ ${escapeHtml(formatDateTime(selectedNotice.deadlineAt))} (한국시간)</p>
+            <p><strong>${escapeHtml(selectedNotice.title)}</strong> · ${escapeHtml(formatDateTime(selectedNotice.startsAt))} ~ ${escapeHtml(formatDateTime(selectedNotice.deadlineAt))} (한국시간)</p>
             <span class="status-pill">${escapeHtml(noticeWorkflowLabel(state, selectedNotice, now))}</span>
           </div>
         ` : ''}
-        ${selectedNotice ? renderRequestFile(selectedNotice, { canReplace: true }) : ''}
+        ${selectedNotice ? renderRequestFile(selectedNotice) : ''}
         ${selectedNotice ? renderInvitationTemplate(selectedNotice, now) : ''}
         ${renderSubmissionReview(state, selectedNotice, now)}
         ${renderResultTemplates(state, selectedNotice)}

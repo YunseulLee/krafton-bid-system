@@ -72,7 +72,7 @@ export function createResultMailTemplates({ notice, proposals, companies }) {
         body: [
           `${contactLine(company)},`,
           '',
-          `${notice.title} 공고 검토 결과 아쉽게도 이번 입찰에서는 탈락 처리되었습니다.`,
+          `${notice.title} 공고 검토 결과 아쉽게도 이번 입찰에서는 선정되지 않았습니다.`,
           '소중한 제안서를 제출해 주셔서 감사드리며, 다음 기회에 다시 함께하길 바랍니다.',
           '',
           '감사합니다.',

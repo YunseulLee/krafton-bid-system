@@ -8,7 +8,7 @@ function renderStartupError(error) {
   app.innerHTML = `
     <section class="empty-state">
       <h1>앱을 시작하지 못했습니다</h1>
-      <p>Supabase 설정과 네트워크 상태를 확인한 뒤 다시 열어 주세요.</p>
+      <p>AWS EKS API 주소와 네트워크 상태를 확인한 뒤 다시 열어 주세요.</p>
     </section>
   `;
 }

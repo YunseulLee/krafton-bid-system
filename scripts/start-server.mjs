@@ -1,11 +1,18 @@
-import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { createReadStream, existsSync } from 'node:fs';
+import { readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve } from 'node:path';
 
 const root = resolve('.');
+const distRoot = resolve(root, 'dist');
+const serverRoot = existsSync(resolve(distRoot, 'index.html')) ? distRoot : root;
+const fallbackIndexPath = resolve(serverRoot, 'index.html');
 const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 4173);
+const publicEnvKeys = [
+  'VITE_BID_API_BASE_URL',
+  'VITE_OPERATOR_LOGIN_REVIEW_MODE',
+];
 
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
@@ -15,12 +22,38 @@ const contentTypes = new Map([
   ['.svg', 'image/svg+xml'],
 ]);
 
+function renderPublicEnvScript() {
+  const publicEnv = Object.fromEntries(publicEnvKeys.map((key) => [key, process.env[key] || '']));
+  return `<script>window.__BID_ENV__ = ${JSON.stringify(publicEnv).replace(/</g, '\\u003c')};</script>`;
+}
+
+function injectPublicEnv(html) {
+  const withoutBuildEnv = html.replace(/\s*<script>window\.__BID_ENV__ = [\s\S]*?;<\/script>\s*/g, '\n');
+  return withoutBuildEnv.replace('</head>', `  ${renderPublicEnvScript()}\n  </head>`);
+}
+
+function isInsideServerRoot(filePath) {
+  return filePath === serverRoot || filePath.startsWith(`${serverRoot}/`);
+}
+
 function resolveRequestPath(url) {
   const pathname = new URL(url, `http://${host}:${port}`).pathname;
   const normalizedPath = normalize(decodeURIComponent(pathname)).replace(/^(\.\.[/\\])+/, '');
-  const filePath = resolve(join(root, normalizedPath === '/' ? 'index.html' : normalizedPath));
-  if (!filePath.startsWith(root)) return null;
+  const filePath = resolve(join(serverRoot, normalizedPath === '/' ? 'index.html' : normalizedPath));
+  if (!isInsideServerRoot(filePath)) return null;
   return filePath;
+}
+
+function shouldServeFallback(url, request) {
+  const pathname = new URL(url, `http://${host}:${port}`).pathname;
+  const acceptsHtml = String(request.headers.accept || '').includes('text/html');
+  return pathname === '/operator' || !extname(pathname) || acceptsHtml;
+}
+
+async function sendHtml(filePath, response) {
+  const html = await readFile(filePath, 'utf8');
+  response.writeHead(200, { 'Content-Type': contentTypes.get('.html') });
+  response.end(injectPublicEnv(html));
 }
 
 const server = createServer(async (request, response) => {
@@ -34,11 +67,21 @@ const server = createServer(async (request, response) => {
   try {
     const fileStat = await stat(filePath);
     const actualPath = fileStat.isDirectory() ? join(filePath, 'index.html') : filePath;
+    if (extname(actualPath) === '.html') {
+      await sendHtml(actualPath, response);
+      return;
+    }
+
     response.writeHead(200, {
       'Content-Type': contentTypes.get(extname(actualPath)) || 'application/octet-stream',
     });
     createReadStream(actualPath).pipe(response);
   } catch {
+    if (shouldServeFallback(request.url || '/', request) && existsSync(fallbackIndexPath)) {
+      await sendHtml(fallbackIndexPath, response);
+      return;
+    }
+
     response.writeHead(404);
     response.end('Not found');
   }

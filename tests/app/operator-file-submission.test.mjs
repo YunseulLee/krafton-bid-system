@@ -33,6 +33,35 @@ test('operator creates a published notice with an open period', () => {
   assert.equal(notice.requestFile.type, 'application/pdf');
 });
 
+test('operator notice creation requires title, category, and summary', () => {
+  const store = createPlatformStore(createSeedData());
+  const requiredInput = {
+    id: 'notice-operator-new',
+    title: '본사 보안 장비 교체',
+    category: '시설관리',
+    summary: '본사 출입 보안 장비를 교체합니다.',
+    requirements: '설치 계획과 유지보수 방안을 포함해 제출해 주세요.',
+    startsAt: '2026-06-22T00:00:00.000Z',
+    deadlineAt: '2026-07-01T18:00:00.000Z',
+    requestFile: {
+      name: '보안장비_제안요청서.pdf',
+      size: 380000,
+      type: 'application/pdf',
+    },
+  };
+
+  for (const field of ['title', 'category', 'summary']) {
+    assert.throws(
+      () => store.createOperatorNotice(operatorId, {
+        ...requiredInput,
+        id: `notice-blank-${field}`,
+        [field]: '   ',
+      }, '2026-06-22T09:00:00.000Z'),
+      /공고명, 분야, 설명을 모두 입력하세요\./
+    );
+  }
+});
+
 test('participant submits a proposal file while the notice is open', () => {
   const store = createPlatformStore(createSeedData());
 
@@ -88,6 +117,35 @@ test('participant cannot replace a proposal file after the deadline', () => {
       size: 640000,
       type: 'application/zip',
     }, '2026-07-06T09:00:00.000Z'),
+    /공고 기간 안에만/
+  );
+});
+
+test('participant cannot submit or replace a proposal file at the exact deadline', () => {
+  const store = createPlatformStore(createSeedData());
+
+  assert.throws(
+    () => store.submitProposalFile(participantId, 'notice-seed-1', {
+      name: '마감정각_제안서.zip',
+      size: 640000,
+      type: 'application/zip',
+    }, '2026-07-05T09:00:00.000Z'),
+    /공고 기간 안에만/
+  );
+
+  const replaceStore = createPlatformStore(createSeedData());
+  replaceStore.submitProposalFile(participantId, 'notice-seed-1', {
+    name: '마감전_제안서.zip',
+    size: 482000,
+    type: 'application/zip',
+  }, '2026-06-23T09:00:00.000Z');
+
+  assert.throws(
+    () => replaceStore.submitProposalFile(participantId, 'notice-seed-1', {
+      name: '마감정각_교체본.zip',
+      size: 640000,
+      type: 'application/zip',
+    }, '2026-07-05T09:00:00.000Z'),
     /공고 기간 안에만/
   );
 });

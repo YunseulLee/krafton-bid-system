@@ -7,11 +7,13 @@ create table if not exists public.profiles (
   company_name text not null,
   role text not null check (role in ('supplier', 'operator')),
   login_expires_at timestamptz null,
+  deleted_at timestamptz null,
   created_at timestamptz not null default now()
 );
 
 alter table public.profiles
-  add column if not exists login_expires_at timestamptz null;
+  add column if not exists login_expires_at timestamptz null,
+  add column if not exists deleted_at timestamptz null;
 
 create table if not exists public.bid_notices (
   id uuid primary key default gen_random_uuid(),
@@ -32,10 +34,20 @@ create table if not exists public.bid_notices (
   constraint bid_notices_valid_period check (starts_at < deadline_at)
 );
 
+create table if not exists public.rfp_file_revisions (
+  id uuid primary key default gen_random_uuid(),
+  notice_id uuid not null references public.bid_notices(id),
+  file_path text not null,
+  file_name text not null,
+  file_size bigint not null default 0,
+  uploaded_at timestamptz not null,
+  replaced_at timestamptz not null default now()
+);
+
 create table if not exists public.proposals (
   id uuid primary key default gen_random_uuid(),
   notice_id uuid not null references public.bid_notices(id) on delete cascade,
-  supplier_id uuid not null references public.profiles(id),
+  supplier_id uuid null references public.profiles(id) on delete set null,
   supplier_company_name text not null,
   file_path text not null,
   file_name text not null,
@@ -46,25 +58,79 @@ create table if not exists public.proposals (
   unique (notice_id, supplier_id)
 );
 
+alter table public.proposals
+  alter column supplier_id drop not null;
+
+do $migration$
+declare
+  proposals_supplier_fk text;
+begin
+  select con.conname
+    into proposals_supplier_fk
+  from pg_constraint con
+  join pg_attribute attribute
+    on attribute.attrelid = con.conrelid
+   and attribute.attnum = any(con.conkey)
+  where con.conrelid = 'public.proposals'::regclass
+    and con.confrelid = 'public.profiles'::regclass
+    and con.contype = 'f'
+    and attribute.attname = 'supplier_id'
+  limit 1;
+
+  if proposals_supplier_fk is not null then
+    execute format('alter table public.proposals drop constraint %I', proposals_supplier_fk);
+  end if;
+end;
+$migration$;
+
+alter table public.proposals
+  add constraint proposals_supplier_id_fkey
+  foreign key (supplier_id)
+  references public.profiles(id)
+  on delete set null;
+
 create table if not exists public.proposal_file_revisions (
   id uuid primary key default gen_random_uuid(),
-  proposal_id uuid not null references public.proposals(id) on delete cascade,
-  notice_id uuid null references public.bid_notices(id) on delete cascade,
-  supplier_id uuid null references public.profiles(id),
+  proposal_id uuid not null references public.proposals(id),
+  notice_id uuid null references public.bid_notices(id),
+  supplier_id uuid null references public.profiles(id) on delete set null,
   supplier_company_name text null,
   file_path text not null,
   file_name text not null,
   file_size bigint not null default 0,
   uploaded_at timestamptz not null,
-  replaced_at timestamptz not null default now(),
-  storage_deleted_at timestamptz null
+  replaced_at timestamptz not null default now()
 );
 
 alter table public.proposal_file_revisions
-  add column if not exists notice_id uuid null references public.bid_notices(id) on delete cascade,
-  add column if not exists supplier_id uuid null references public.profiles(id),
-  add column if not exists supplier_company_name text null,
-  add column if not exists storage_deleted_at timestamptz null;
+  add column if not exists notice_id uuid null references public.bid_notices(id),
+  add column if not exists supplier_id uuid null references public.profiles(id) on delete set null,
+  add column if not exists supplier_company_name text null;
+
+alter table public.rfp_file_revisions
+  drop constraint if exists rfp_file_revisions_notice_id_fkey,
+  add constraint rfp_file_revisions_notice_id_fkey
+  foreign key (notice_id)
+  references public.bid_notices(id);
+
+alter table public.proposal_file_revisions
+  drop constraint if exists proposal_file_revisions_proposal_id_fkey,
+  add constraint proposal_file_revisions_proposal_id_fkey
+  foreign key (proposal_id)
+  references public.proposals(id);
+
+alter table public.proposal_file_revisions
+  drop constraint if exists proposal_file_revisions_notice_id_fkey,
+  add constraint proposal_file_revisions_notice_id_fkey
+  foreign key (notice_id)
+  references public.bid_notices(id);
+
+alter table public.proposal_file_revisions
+  drop constraint if exists proposal_file_revisions_supplier_id_fkey,
+  add constraint proposal_file_revisions_supplier_id_fkey
+  foreign key (supplier_id)
+  references public.profiles(id)
+  on delete set null;
 
 do $migration$
 begin
@@ -97,6 +163,7 @@ create table if not exists public.evaluations (
 
 create index if not exists bid_notices_deadline_idx on public.bid_notices(deadline_at);
 create index if not exists proposals_notice_idx on public.proposals(notice_id);
+create index if not exists rfp_file_revisions_notice_idx on public.rfp_file_revisions(notice_id);
 create index if not exists proposal_file_revisions_proposal_idx on public.proposal_file_revisions(proposal_id);
 create index if not exists evaluations_notice_idx on public.evaluations(notice_id);
 
@@ -132,6 +199,7 @@ as $$
     from public.profiles
     where id = auth.uid()
       and role = 'supplier'
+      and deleted_at is null
       and (login_expires_at is null or login_expires_at > now())
   )
 $$;
@@ -159,14 +227,46 @@ begin
     coalesce(nullif(metadata->>'name', ''), '입찰 참여자'),
     coalesce(nullif(metadata->>'company_name', ''), split_part(coalesce(new.email, ''), '@', 1), '미등록 업체'),
     'supplier',
-    nullif(metadata->>'login_expires_at', '')::timestamptz
+    now() + interval '14 days'
   )
   on conflict (id) do update
     set email = excluded.email,
-        login_expires_at = excluded.login_expires_at;
+        login_expires_at = now() + interval '14 days',
+        deleted_at = null;
 
   return new;
 end;
+$$;
+
+create or replace view public.expired_supplier_profiles as
+select
+  id,
+  email,
+  company_name,
+  login_expires_at
+from public.profiles
+where role = 'supplier'
+  and deleted_at is null
+  and login_expires_at is not null
+  and login_expires_at <= now();
+
+create or replace function public.mark_expired_supplier_profiles_deleted()
+returns table(id uuid, email text)
+language sql
+security definer
+set search_path = public
+as $$
+  update public.profiles
+  set
+    deleted_at = now(),
+    email = concat('deleted+', id::text, '@expired.local'),
+    name = '삭제된 입찰자 계정',
+    company_name = '삭제된 업체'
+  where role = 'supplier'
+    and deleted_at is null
+    and login_expires_at is not null
+    and login_expires_at <= now()
+  returning id, email;
 $$;
 
 drop trigger if exists handle_new_auth_user on auth.users;
@@ -200,6 +300,10 @@ declare
   notice_deadline_at timestamptz;
   notice_result_notified_at timestamptz;
 begin
+  if not public.is_operator() or new.evaluator_id <> auth.uid() then
+    raise exception 'only the signed-in operator can write evaluations';
+  end if;
+
   select proposal.notice_id, notice.deadline_at, notice.result_notified_at
     into proposal_notice_id, notice_deadline_at, notice_result_notified_at
   from public.proposals proposal
@@ -214,7 +318,7 @@ begin
     raise exception 'evaluation notice_id must match proposal.notice_id';
   end if;
 
-  if notice_deadline_at >= now() then
+  if notice_deadline_at > now() then
     raise exception 'deadline_at must pass before evaluations can be written';
   end if;
 
@@ -244,6 +348,37 @@ begin
   end if;
 
   if old.result_notified_at is not null and (
+    new.title is distinct from old.title
+    or new.category is distinct from old.category
+    or new.summary is distinct from old.summary
+    or new.starts_at is distinct from old.starts_at
+    or new.deadline_at is distinct from old.deadline_at
+    or new.status is distinct from old.status
+    or new.rfp_file_path is distinct from old.rfp_file_path
+    or new.rfp_file_name is distinct from old.rfp_file_name
+    or new.rfp_file_size is distinct from old.rfp_file_size
+    or new.created_by is distinct from old.created_by
+    or new.preferred_proposal_id is distinct from old.preferred_proposal_id
+    or new.result_notified_at is distinct from old.result_notified_at
+  ) then
+    raise exception 'result_notified_at locks notice changes';
+  end if;
+
+  if new.starts_at is distinct from old.starts_at then
+    raise exception 'starts_at cannot change after notice creation';
+  end if;
+
+  if new.deadline_at is distinct from old.deadline_at then
+    if old.deadline_at <= now() then
+      raise exception 'deadline_at cannot change after the original deadline has passed';
+    end if;
+
+    if new.deadline_at < old.deadline_at then
+      raise exception 'deadline_at cannot be shortened';
+    end if;
+  end if;
+
+  if old.result_notified_at is not null and (
     new.preferred_proposal_id is distinct from old.preferred_proposal_id
     or new.result_notified_at is distinct from old.result_notified_at
   ) then
@@ -252,7 +387,7 @@ begin
 
   if new.preferred_proposal_id is distinct from old.preferred_proposal_id
     and new.preferred_proposal_id is not null then
-    if not (new.deadline_at < now()) then
+    if not (new.deadline_at <= now()) then
       raise exception 'deadline_at must pass before preferred_proposal_id can change';
     end if;
 
@@ -336,7 +471,7 @@ begin
 
     if notice_status <> 'published'
       or notice_starts_at > now()
-      or notice_deadline_at < now()
+      or notice_deadline_at <= now()
       or notice_result_notified_at is not null then
       raise exception 'proposal file replacement is allowed only before deadline';
     end if;
@@ -356,7 +491,7 @@ begin
     raise exception 'proposal result status must be selected or not_selected';
   end if;
 
-  if notice_deadline_at >= now() then
+  if notice_deadline_at > now() then
     raise exception 'deadline_at must pass before proposal result updates';
   end if;
 
@@ -376,6 +511,38 @@ begin
       )
   ) then
     raise exception 'all submitted proposals need evaluations before proposal result updates';
+  end if;
+
+  return new;
+end;
+$$;
+
+create or replace function public.record_rfp_file_revision()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.rfp_file_path is distinct from old.rfp_file_path
+    or new.rfp_file_name is distinct from old.rfp_file_name
+    or new.rfp_file_size is distinct from old.rfp_file_size then
+    insert into public.rfp_file_revisions (
+      notice_id,
+      file_path,
+      file_name,
+      file_size,
+      uploaded_at,
+      replaced_at
+    )
+    values (
+      old.id,
+      old.rfp_file_path,
+      old.rfp_file_name,
+      old.rfp_file_size,
+      old.updated_at,
+      now()
+    );
   end if;
 
   return new;
@@ -420,7 +587,7 @@ begin
 end;
 $$;
 
-create or replace function public.list_expired_proposal_revision_files(retention_days integer default 30)
+create or replace function public.list_retained_proposal_revision_files(retention_days integer default 30)
 returns table(id uuid, file_path text)
 language sql
 stable
@@ -431,7 +598,6 @@ as $$
   from public.proposal_file_revisions revision
   join public.bid_notices notice on notice.id = revision.notice_id
   where public.is_operator()
-    and revision.storage_deleted_at is null
     and notice.result_notified_at is not null
     and notice.result_notified_at + make_interval(days => retention_days) < now()
 $$;
@@ -470,6 +636,7 @@ where supplier_id = auth.uid();
 alter table public.profiles enable row level security;
 alter table public.bid_notices enable row level security;
 alter table public.proposals enable row level security;
+alter table public.rfp_file_revisions enable row level security;
 alter table public.proposal_file_revisions enable row level security;
 alter table public.evaluations enable row level security;
 
@@ -491,6 +658,12 @@ before update on public.proposals
 for each row
 execute function public.validate_proposal_update();
 
+drop trigger if exists record_rfp_file_revision on public.bid_notices;
+create trigger record_rfp_file_revision
+before update of rfp_file_path, rfp_file_name, rfp_file_size on public.bid_notices
+for each row
+execute function public.record_rfp_file_revision();
+
 drop trigger if exists record_proposal_file_revision on public.proposals;
 create trigger record_proposal_file_revision
 before update of file_path, file_name, file_size on public.proposals
@@ -500,6 +673,7 @@ execute function public.record_proposal_file_revision();
 revoke all on public.profiles from anon, authenticated;
 revoke all on public.bid_notices from anon, authenticated;
 revoke all on public.proposals from anon, authenticated;
+revoke all on public.rfp_file_revisions from anon, authenticated;
 revoke all on public.proposal_file_revisions from anon, authenticated;
 revoke all on public.evaluations from anon, authenticated;
 grant select on public.profiles to authenticated;
@@ -507,7 +681,8 @@ grant select on public.participant_bid_notices to authenticated;
 grant select on public.participant_proposals to authenticated;
 grant select, insert, update on public.bid_notices to authenticated;
 grant insert, select, update on public.proposals to authenticated;
-grant select, update on public.proposal_file_revisions to authenticated;
+grant select on public.rfp_file_revisions to authenticated;
+grant select on public.proposal_file_revisions to authenticated;
 grant select, insert, update on public.evaluations to authenticated;
 
 drop policy if exists "profiles read own or operator" on public.profiles;
@@ -533,7 +708,7 @@ with check (
     where notice.id = notice_id
       and notice.status = 'published'
       and notice.starts_at <= now()
-      and notice.deadline_at >= now()
+      and notice.deadline_at > now()
       and notice.result_notified_at is null
   )
 );
@@ -551,7 +726,7 @@ using (
     where notice.id = notice_id
       and notice.status = 'published'
       and notice.starts_at <= now()
-      and notice.deadline_at >= now()
+      and notice.deadline_at > now()
       and notice.result_notified_at is null
   )
 )
@@ -565,7 +740,7 @@ with check (
     where notice.id = notice_id
       and notice.status = 'published'
       and notice.starts_at <= now()
-      and notice.deadline_at >= now()
+      and notice.deadline_at > now()
       and notice.result_notified_at is null
   )
 );
@@ -579,7 +754,7 @@ using (
     select 1
     from public.bid_notices notice
     where notice.id = notice_id
-      and notice.deadline_at < now()
+      and notice.deadline_at <= now()
   )
 );
 
@@ -598,11 +773,15 @@ create policy "operators read evaluations"
 on public.evaluations for select to authenticated
 using (public.is_operator());
 
-drop policy if exists "operators mark proposal revision storage deleted" on public.proposal_file_revisions;
-create policy "operators mark proposal revision storage deleted"
-on public.proposal_file_revisions for update to authenticated
-using (public.is_operator())
-with check (public.is_operator());
+drop policy if exists "operators read rfp file revisions" on public.rfp_file_revisions;
+create policy "operators read rfp file revisions"
+on public.rfp_file_revisions for select to authenticated
+using (public.is_operator());
+
+drop policy if exists "operators read proposal file revisions" on public.proposal_file_revisions;
+create policy "operators read proposal file revisions"
+on public.proposal_file_revisions for select to authenticated
+using (public.is_operator());
 
 drop policy if exists "operators create evaluations" on public.evaluations;
 create policy "operators create evaluations"
@@ -630,16 +809,18 @@ with check (
 );
 
 drop policy if exists "authenticated users read rfp files" on storage.objects;
-create policy "authenticated users read rfp files"
+drop policy if exists "authenticated users read current rfp files" on storage.objects;
+create policy "authenticated users read current rfp files"
 on storage.objects for select to authenticated
-using (bucket_id = 'rfp-files');
-
-drop policy if exists "operators delete rfp files" on storage.objects;
-create policy "operators delete rfp files"
-on storage.objects for delete to authenticated
 using (
   bucket_id = 'rfp-files'
-  and public.is_operator()
+  and (public.is_supplier() or public.is_operator())
+  and exists (
+    select 1
+    from public.bid_notices notice
+    where notice.rfp_file_path = name
+      and notice.status = 'published'
+  )
 );
 
 drop policy if exists "suppliers upload proposal files to own folder" on storage.objects;
@@ -658,7 +839,7 @@ with check (
     where notice.id = public.uuid_or_null((storage.foldername(name))[2])
       and notice.status = 'published'
       and notice.starts_at <= now()
-      and notice.deadline_at >= now()
+      and notice.deadline_at > now()
       and notice.result_notified_at is null
   )
 );
@@ -675,13 +856,13 @@ using (
     join public.bid_notices notice on notice.id = proposal.notice_id
     where proposal.file_path = name
       and proposal.notice_id = public.uuid_or_null((storage.foldername(name))[2])
-      and notice.deadline_at < now()
+      and notice.deadline_at <= now()
   )
 );
 
-drop policy if exists "operators delete replaced proposal files after notification retention" on storage.objects;
-create policy "operators delete replaced proposal files after notification retention"
-on storage.objects for delete to authenticated
+drop policy if exists "operators read retained proposal revision files after deadline" on storage.objects;
+create policy "operators read retained proposal revision files after deadline"
+on storage.objects for select to authenticated
 using (
   bucket_id = 'proposal-files'
   and public.is_operator()
@@ -690,8 +871,7 @@ using (
     from public.proposal_file_revisions revision
     join public.bid_notices notice on notice.id = revision.notice_id
     where revision.file_path = name
-      and revision.storage_deleted_at is null
-      and notice.result_notified_at is not null
-      and notice.result_notified_at + interval '30 days' < now()
+      and revision.notice_id = public.uuid_or_null((storage.foldername(name))[2])
+      and notice.deadline_at <= now()
   )
 );

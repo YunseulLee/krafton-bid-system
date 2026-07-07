@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
-test('browser app uses Supabase email login instead of demo role buttons', async () => {
+test('browser app uses the EKS API client instead of demo role buttons', async () => {
   const source = await readFile('src/ui/app.js', 'utf8');
 
-  assert.match(source, /createSupabaseBrowserClient/);
-  assert.match(source, /createSupabaseBidStore/);
+  assert.match(source, /createBidApiClient/);
+  assert.match(source, /createApiBidStore/);
+  assert.doesNotMatch(source, /createSupabaseBrowserClient/);
+  assert.doesNotMatch(source, /createSupabaseBidStore/);
   assert.match(source, /name="email"/);
   assert.match(source, /name="password"/);
   assert.match(source, /name="operatorEmail"/);
@@ -48,9 +50,33 @@ test('operator login is visible on the public login screen while review testing 
   const app = await import('../../src/ui/app.js');
 
   assert.equal(typeof app.isOperatorLoginVisible, 'function');
-  assert.equal(app.isOperatorLoginVisible(new URL('https://bid.example.com/')), true);
+  assert.equal(app.isOperatorLoginVisible(new URL('https://bid.example.com/')), false);
+  assert.equal(app.isOperatorLoginVisible(new URL('https://bid.example.com/'), { reviewMode: true }), true);
   assert.equal(app.isOperatorLoginVisible(new URL('https://bid.example.com/'), { reviewMode: false }), false);
   assert.equal(app.isOperatorLoginVisible(new URL('https://bid.example.com/operator'), { reviewMode: false }), true);
+});
+
+test('first access separates participant and operator login pages', async () => {
+  const app = await import('../../src/ui/app.js');
+  const source = await readFile('src/ui/app.js', 'utf8');
+
+  assert.equal(typeof app.chooseInitialAuthView, 'function');
+  assert.equal(app.chooseInitialAuthView(new URL('https://bid.example.com/')), 'entry');
+  assert.equal(app.chooseInitialAuthView(new URL('https://bid.example.com/operator')), 'operator');
+  assert.match(source, /renderRoleSelection/);
+  assert.match(source, /data-auth-view="supplier"/);
+  assert.match(source, /data-auth-view="operator"/);
+  assert.match(source, /data-auth-view="entry"/);
+  assert.match(source, /renderSupplierAuthScreen/);
+  assert.match(source, /renderOperatorAuthScreen/);
+  assert.match(source, /입찰자 로그인/);
+  assert.match(source, /운영자 로그인/);
+  assert.doesNotMatch(source, /입찰자 로그인 페이지/);
+  assert.doesNotMatch(source, /운영자 로그인 페이지/);
+  assert.match(source, /입찰목록 업로드/);
+  assert.match(source, /입찰 내용 확인 및 제안/);
+  assert.match(source, /제안서 확인 및 검토/);
+  assert.match(source, /authView === 'entry' \? renderRoleSelection\(\) : ''/);
 });
 
 test('selected notice is retained only when it exists in the refreshed notice list', async () => {

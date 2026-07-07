@@ -1,0 +1,78 @@
+{
+  "Name": "krafton-bid-operator-allowlist",
+  "Scope": "REGIONAL",
+  "DefaultAction": {
+    "Allow": {}
+  },
+  "Description": "Allow public bidder access while blocking /operator and ?operator=1 outside approved office IPs.",
+  "Rules": [
+    {
+      "Name": "block-operator-path-outside-approved-ips",
+      "Priority": 0,
+      "Statement": {
+        "AndStatement": {
+          "Statements": [
+            {
+              "OrStatement": {
+                "Statements": [
+                  {
+                    "ByteMatchStatement": {
+                      "SearchString": "/operator",
+                      "FieldToMatch": {
+                        "UriPath": {}
+                      },
+                      "TextTransformations": [
+                        {
+                          "Priority": 0,
+                          "Type": "NONE"
+                        }
+                      ],
+                      "PositionalConstraint": "STARTS_WITH"
+                    }
+                  },
+                  {
+                    "ByteMatchStatement": {
+                      "SearchString": "operator=1",
+                      "FieldToMatch": {
+                        "QueryString": {}
+                      },
+                      "TextTransformations": [
+                        {
+                          "Priority": 0,
+                          "Type": "NONE"
+                        }
+                      ],
+                      "PositionalConstraint": "CONTAINS"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "NotStatement": {
+                "Statement": {
+                  "IPSetReferenceStatement": {
+                    "ARN": "arn:aws:wafv2:ap-northeast-2:ACCOUNT_ID:regional/ipset/krafton-bid-operator-ips/IP_SET_ID"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "Action": {
+        "Block": {}
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "blockOperatorPathOutsideApprovedIps"
+      }
+    }
+  ],
+  "VisibilityConfig": {
+    "SampledRequestsEnabled": true,
+    "CloudWatchMetricsEnabled": true,
+    "MetricName": "kraftonBidOperatorAllowlist"
+  }
+}

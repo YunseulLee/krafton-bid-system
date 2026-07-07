@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: krafton-bid-api
+  namespace: krafton-bid
+  labels:
+    app.kubernetes.io/name: krafton-bid-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: krafton-bid-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: krafton-bid-api
+    spec:
+      serviceAccountName: krafton-bid-api
+      containers:
+        - name: api
+          image: ACCOUNT_ID.dkr.ecr.ap-northeast-2.amazonaws.com/krafton-bid-api:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: AWS_REGION
+              value: ap-northeast-2
+            - name: DATABASE_ENGINE
+              value: RDS PostgreSQL
+            - name: DATABASE_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: krafton-bid-postgresql
+                  key: host
+            - name: DATABASE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: krafton-bid-postgresql
+                  key: database
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: krafton-bid-postgresql
+                  key: username
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: krafton-bid-postgresql
+                  key: password
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: krafton-bid-api-config
+                  key: s3Bucket
+            - name: SUPPLIER_LOGIN_TTL_DAYS
+              value: "14"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: krafton-bid-api
+  namespace: krafton-bid
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/krafton-bid-api-irsa
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: krafton-bid-api
+  namespace: krafton-bid
+spec:
+  selector:
+    app.kubernetes.io/name: krafton-bid-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: krafton-bid-api-config
+  namespace: krafton-bid
+data:
+  s3Bucket: krafton-bid-files

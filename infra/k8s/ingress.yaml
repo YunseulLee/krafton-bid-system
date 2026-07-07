@@ -1,0 +1,38 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: krafton-bid
+  namespace: krafton-bid
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:ap-northeast-2:ACCOUNT_ID:regional/webacl/krafton-bid-operator-allowlist/WEB_ACL_ID
+spec:
+  rules:
+    - host: bid.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: krafton-bid-api
+                port:
+                  number: 80
+          - path: /operator
+            pathType: Prefix
+            backend:
+              service:
+                name: krafton-bid-web
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: krafton-bid-web
+                port:
+                  number: 80
